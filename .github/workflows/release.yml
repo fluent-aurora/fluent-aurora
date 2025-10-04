@@ -1,0 +1,42 @@
+name: Create release
+
+on:
+  workflow_call:
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: fluent_aurora
+          path: ./publish/desktop
+
+      - name: Create ZIP archive
+        run: |
+          cd publish/desktop
+          powershell Compress-Archive -Path * -DestinationPath ../../fluent_aurora.zip
+
+      - name: Get short SHA
+        id: slug
+        run: |
+          $shortSha = "${{ github.sha }}".Substring(0,9)
+          echo "sha_short=$shortSha" >> $env:GITHUB_OUTPUT
+
+      - name: Draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Fluent Aurora (${{ steps.slug.outputs.sha_short }})
+          draft: true
+          files: fluent_aurora.zip
+          tag_name: ${{ steps.slug.outputs.sha_short }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

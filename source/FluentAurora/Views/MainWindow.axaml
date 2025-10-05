@@ -3,14 +3,97 @@
         xmlns:vm="using:FluentAurora.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" 
-        d:DesignWidth="1000" d:DesignHeight="600"
+        xmlns:ui="using:FluentAvalonia.UI.Controls"
+        xmlns:custom="using:FluentAurora.Controls"
+        mc:Ignorable="d"
+        d:DesignWidth="1200" d:DesignHeight="700"
         x:Class="FluentAurora.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/icon.ico"
         Title="Fluent Aurora"
-        Background="{DynamicResource WindowBackgroundBrush}">
+        MinHeight="100"
+        MinWidth="810"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="48">
     <Design.DataContext>
-        <vm:MainWindowViewModel/>
+        <vm:MainWindowViewModel />
     </Design.DataContext>
+    <!-- Main Content -->
+    <Grid RowDefinitions="Auto,*">
+        <!-- Title Bar -->
+        <Grid Grid.Row="0"
+              Height="48"
+              Background="Transparent"
+              Name="TitleBar"
+              IsHitTestVisible="False">
+            <!-- Content on top of the draggable area -->
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  IsHitTestVisible="False">
+                <!-- Icon, Title -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            Spacing="0"
+                            Margin="0,0,0,0"
+                            VerticalAlignment="Center">
+                    <!-- Icon -->
+                    <Image Source="/Assets/icon.ico"
+                           Width="48"
+                           Height="48"
+                           VerticalAlignment="Center" />
+                    <!-- Title -->
+                    <TextBlock Text="Fluent Aurora"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                </StackPanel>
+                <!-- Center -->
+                <Grid Grid.Column="1">
+                    <!-- Content -->
+                </Grid>
+                <!-- Right side-->
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            Margin="0,0,140,0"
+                            VerticalAlignment="Center">
+                    <!-- Content -->
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1">
+            <!-- NavigationView -->
+            <ui:NavigationView AlwaysShowHeader="False"
+                               OpenPaneLength="150">
+                <!-- Navigation Menu Items -->
+                <ui:NavigationView.MenuItems>
+                    <ui:NavigationViewItem Content="Now Playing"
+                                           Tag="NowPlaying">
+                        <ui:NavigationViewItem.IconSource>
+                            <ui:SymbolIconSource Symbol="Play" />
+                        </ui:NavigationViewItem.IconSource>
+                    </ui:NavigationViewItem>
+
+                    <ui:NavigationViewItem Content="Library"
+                                           Tag="Library">
+                        <ui:NavigationViewItem.IconSource>
+                            <ui:SymbolIconSource Symbol="Library" />
+                        </ui:NavigationViewItem.IconSource>
+                    </ui:NavigationViewItem>
+                </ui:NavigationView.MenuItems>
+            </ui:NavigationView>
+
+            <!-- Content -->
+            <Grid>
+                <!-- Content Player -->
+                <ui:Frame x:Name="ContentFrame" />
+
+                <!-- Playback Control -->
+                <custom:PlaybackControl VerticalAlignment="Bottom"
+                                        Height="100" />
+            </Grid>
+        </Grid>
+    </Grid>
 </Window>

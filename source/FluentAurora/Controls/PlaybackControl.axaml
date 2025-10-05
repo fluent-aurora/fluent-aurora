@@ -1,0 +1,122 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:vm="using:FluentAurora.ViewModels"
+             xmlns:converters="using:FluentAurora.Converters"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="100"
+             x:Class="FluentAurora.Controls.PlaybackControl">
+    <UserControl.Resources>
+        <converters:PositionToTimeConverter x:Key="TimeConverter" />
+    </UserControl.Resources>
+    <Design.DataContext>
+        <vm:PlaybackControlViewModel />
+    </Design.DataContext>
+    <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+            BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+        <Grid ColumnDefinitions="300,*,300" Margin="20,10">
+            <!-- Track Info -->
+            <Grid Grid.Column="0" ColumnDefinitions="Auto,*">
+                <Border Width="60"
+                        Height="60"
+                        CornerRadius="4"
+                        Background="#FF2D2D2D"
+                        Margin="0,0,15,0">
+                    <Image Source="{Binding SongAlbumArt}"
+                           Stretch="UniformToFill" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SongTitle}" FontWeight="SemiBold" FontSize="14" />
+                    <TextBlock Text="{Binding SongArtist}" Opacity="0.7" FontSize="12" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Playback Buttons -->
+            <Grid Grid.Column="1"
+                  VerticalAlignment="Center"
+                  HorizontalAlignment="Center">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Orientation="Vertical">
+
+                    <!-- Button row -->
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Spacing="15">
+                        <Button>
+                            <ui:SymbolIcon Symbol="PreviousFilled" />
+                        </Button>
+                        <Button Command="{Binding TogglePlayCommand}">
+                            <ui:SymbolIcon Symbol="{Binding PlayPauseIcon}" />
+                        </Button>
+                        <Button>
+                            <ui:SymbolIcon Symbol="NextFilled" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Progress slider -->
+                    <Slider Width="400"
+                            Minimum="0"
+                            Maximum="{Binding SongDuration}"
+                            Value="{Binding CurrentPosition}">
+                        <ToolTip.Tip>
+                            <TextBlock>
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource TimeConverter}">
+                                        <Binding Path="CurrentPosition" />
+                                        <Binding Path="SongDuration" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </ToolTip.Tip>
+                    </Slider>
+                    <TextBlock FontSize="12"
+                               Opacity="0.7"
+                               HorizontalAlignment="Center"
+                               Margin="-12">
+                        <TextBlock.Text>
+                            <MultiBinding Converter="{x:Static converters:PositionToTimeConverter.Instance}">
+                                <Binding Path="CurrentPosition" />
+                                <Binding Path="SongDuration" />
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <!-- Volume -->
+            <Grid Grid.Column="2"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Center"
+                  ColumnDefinitions="Auto,Auto,Auto"
+                  ColumnSpacing="10">
+                <!-- Icon -->
+                <ui:SymbolIcon Symbol="{Binding VolumeIcon}"
+                               Grid.Column="0"
+                               VerticalAlignment="Center" />
+
+                <!-- Slider -->
+                <Slider Grid.Column="1"
+                        Width="100"
+                        Minimum="0"
+                        Maximum="100"
+                        Value="{Binding CurrentVolume}"
+                        VerticalAlignment="Center">
+                    <ToolTip.Tip>
+                        <TextBlock Text="{Binding CurrentVolume, StringFormat='{}{0}%'}" />
+                    </ToolTip.Tip>
+                </Slider>
+
+                <!-- Volume Text -->
+                <TextBlock Grid.Column="2"
+                           FontSize="12"
+                           Width="28"
+                           Opacity="0.7"
+                           VerticalAlignment="Center"
+                           Text="{Binding CurrentVolume, StringFormat='{}{0}%'}" />
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

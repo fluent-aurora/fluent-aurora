@@ -40,11 +40,13 @@
                 <StackPanel HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Orientation="Vertical">
-
                     <!-- Button row -->
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 Spacing="15">
+                        <Button Command="{Binding OpenFileCommand}" ToolTip.Tip="Open Audio File">
+                            <ui:SymbolIcon Symbol="Folder" />
+                        </Button>
                         <Button>
                             <ui:SymbolIcon Symbol="PreviousFilled" />
                         </Button>
@@ -57,19 +59,13 @@
                     </StackPanel>
 
                     <!-- Progress slider -->
-                    <Slider Width="400"
+                    <Slider x:Name="ProgressSlider"
+                            Width="400"
                             Minimum="0"
                             Maximum="{Binding SongDuration}"
-                            Value="{Binding CurrentPosition}">
+                            Value="{Binding DisplayPosition, Mode=TwoWay}">
                         <ToolTip.Tip>
-                            <TextBlock>
-                                <TextBlock.Text>
-                                    <MultiBinding Converter="{StaticResource TimeConverter}">
-                                        <Binding Path="CurrentPosition" />
-                                        <Binding Path="SongDuration" />
-                                    </MultiBinding>
-                                </TextBlock.Text>
-                            </TextBlock>
+                            <TextBlock Text="{Binding DisplayPosition, Converter={x:Static converters:PositionToTimeConverter.Instance}}" />
                         </ToolTip.Tip>
                     </Slider>
                     <TextBlock FontSize="12"
@@ -78,7 +74,7 @@
                                Margin="-12">
                         <TextBlock.Text>
                             <MultiBinding Converter="{x:Static converters:PositionToTimeConverter.Instance}">
-                                <Binding Path="CurrentPosition" />
+                                <Binding Path="DisplayPosition" />
                                 <Binding Path="SongDuration" />
                             </MultiBinding>
                         </TextBlock.Text>

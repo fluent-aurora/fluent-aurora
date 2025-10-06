@@ -13,6 +13,7 @@ namespace FluentAurora;
 
 public partial class App : Application
 {
+    public static Window? MainWindow => Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null;
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);

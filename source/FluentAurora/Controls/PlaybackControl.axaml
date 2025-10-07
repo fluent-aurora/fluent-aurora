@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:ic="using:FluentIcons.Avalonia.Fluent"
              xmlns:vm="using:FluentAurora.ViewModels"
              xmlns:converters="using:FluentAurora.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="100"
@@ -45,16 +46,19 @@
                                 HorizontalAlignment="Center"
                                 Spacing="15">
                         <Button Command="{Binding OpenFileCommand}" ToolTip.Tip="Open Audio File">
-                            <ui:SymbolIcon Symbol="Folder" />
+                            <ic:SymbolIcon Symbol="FolderOpen"/>
                         </Button>
                         <Button>
-                            <ui:SymbolIcon Symbol="PreviousFilled" />
+                            <ic:SymbolIcon Symbol="Previous"/>
                         </Button>
                         <Button Command="{Binding TogglePlayCommand}">
-                            <ui:SymbolIcon Symbol="{Binding PlayPauseIcon}" />
+                            <ic:SymbolIcon Symbol="{Binding PlayPauseIcon}"/>
                         </Button>
                         <Button>
-                            <ui:SymbolIcon Symbol="NextFilled" />
+                            <ic:SymbolIcon Symbol="Next"/>
+                        </Button>
+                        <Button Command="{Binding ToggleRepeatCommand}" ToolTip.Tip="Toggle Repeat Mode">
+                            <ic:SymbolIcon Symbol="{Binding RepeatIcon}"/>
                         </Button>
                     </StackPanel>
 
@@ -89,7 +93,7 @@
                   ColumnDefinitions="Auto,Auto,Auto"
                   ColumnSpacing="10">
                 <!-- Icon -->
-                <ui:SymbolIcon Symbol="{Binding VolumeIcon}"
+                <ic:SymbolIcon Symbol="{Binding VolumeIcon}"
                                Grid.Column="0"
                                VerticalAlignment="Center" />
 

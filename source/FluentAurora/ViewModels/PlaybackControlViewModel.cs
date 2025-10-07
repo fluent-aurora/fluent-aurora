@@ -24,14 +24,22 @@ public partial class PlaybackControlViewModel : ViewModelBase
     [ObservableProperty] private int currentVolume = 100;
     [ObservableProperty] private bool isPlaying;
 
-    public string PlayPauseIcon => IsPlaying ? "PauseFilled" : "PlayFilled";
+    public string PlayPauseIcon => IsPlaying ? "Pause" : "Play";
+
+    [ObservableProperty] private RepeatMode repeatMode = RepeatMode.One;
+
+    public string RepeatIcon => RepeatMode switch
+    {
+        RepeatMode.All => "ArrowRepeatAll",
+        RepeatMode.One => "ArrowRepeat1",
+        _ => "ArrowRepeatAllOff"
+    };
 
     public string VolumeIcon => CurrentVolume switch
     {
-        >= 1 and < 10 => "Speaker0",
-        >= 10 and < 50 => "Speaker1",
-        >= 50 and < 100 => "Speaker2",
-        100 => "Volume",
+        >= 1 and < 25 => "Speaker0",
+        >= 26 and < 60 => "Speaker1",
+        >= 61 and <= 100 => "Speaker2",
         _ => "SpeakerMute"
     };
 
@@ -83,6 +91,21 @@ public partial class PlaybackControlViewModel : ViewModelBase
         {
             _audioPlayerService.Pause();
         }
+    }
+
+    partial void OnRepeatModeChanged(RepeatMode value)
+    {
+        OnPropertyChanged(nameof(RepeatIcon));
+        UpdateRepeatMode();
+    }
+
+    private void UpdateRepeatMode()
+    {
+        _audioPlayerService.IsLooping = RepeatMode switch
+        {
+            RepeatMode.Off => false,
+            _ => true // RepeatMode.All & RepeatMode.On
+        };
     }
 
     partial void OnCurrentVolumeChanged(int value)
@@ -138,6 +161,17 @@ public partial class PlaybackControlViewModel : ViewModelBase
 
     [RelayCommand]
     private void TogglePlay() => IsPlaying = !IsPlaying;
+
+    [RelayCommand]
+    private void ToggleRepeat()
+    {
+        RepeatMode = RepeatMode switch
+        {
+            RepeatMode.All => RepeatMode.One,
+            RepeatMode.One => RepeatMode.Off,
+            _ => RepeatMode.All
+        };
+    }
 
     [RelayCommand]
     private async Task OpenFile()

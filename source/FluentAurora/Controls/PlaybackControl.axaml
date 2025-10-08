@@ -6,6 +6,7 @@
              xmlns:ic="using:FluentIcons.Avalonia.Fluent"
              xmlns:vm="using:FluentAurora.ViewModels"
              xmlns:converters="using:FluentAurora.Converters"
+             xmlns:controls="using:FluentAurora.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="100"
              x:Class="FluentAurora.Controls.PlaybackControl">
     <UserControl.Resources>
@@ -17,7 +18,7 @@
     <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
             BorderThickness="0,1,0,0"
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
-        <Grid ColumnDefinitions="300,*,300" Margin="20,10">
+        <Grid ColumnDefinitions="*,Auto,*" Margin="20,10">
             <!-- Track Info -->
             <Grid Grid.Column="0" ColumnDefinitions="Auto,*">
                 <Border Width="60"
@@ -29,13 +30,27 @@
                            Stretch="UniformToFill" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding SongTitle}" FontWeight="SemiBold" FontSize="14" />
-                    <TextBlock Text="{Binding SongArtist}" Opacity="0.7" FontSize="12" />
+                    <controls:ScrollingTextBlock Text="{Binding SongTitle}" 
+                                                 ShowToolTip="True"
+                                                 FontWeight="SemiBold" 
+                                                 FontSize="14"
+                                                 PauseBeforeScroll="2000"
+                                                 ScrollSpeed="30"
+                                                 ScrollGap="50" />
+        
+                    <controls:ScrollingTextBlock Text="{Binding SongArtist}"
+                                                 ShowToolTip="True"
+                                                 Opacity="0.7"
+                                                 FontSize="12"
+                                                 PauseBeforeScroll="2000"
+                                                 ScrollSpeed="25"
+                                                 ScrollGap="50" />
                 </StackPanel>
             </Grid>
 
             <!-- Playback Buttons -->
             <Grid Grid.Column="1"
+                  MinWidth="500"
                   VerticalAlignment="Center"
                   HorizontalAlignment="Center">
                 <StackPanel HorizontalAlignment="Center"
@@ -46,19 +61,19 @@
                                 HorizontalAlignment="Center"
                                 Spacing="15">
                         <Button Command="{Binding OpenFileCommand}" ToolTip.Tip="Open Audio File">
-                            <ic:SymbolIcon Symbol="FolderOpen"/>
+                            <ic:SymbolIcon Symbol="FolderOpen" />
                         </Button>
                         <Button>
-                            <ic:SymbolIcon Symbol="Previous"/>
+                            <ic:SymbolIcon Symbol="Previous" />
                         </Button>
                         <Button Command="{Binding TogglePlayCommand}">
-                            <ic:SymbolIcon Symbol="{Binding PlayPauseIcon}"/>
+                            <ic:SymbolIcon Symbol="{Binding PlayPauseIcon}" />
                         </Button>
                         <Button>
-                            <ic:SymbolIcon Symbol="Next"/>
+                            <ic:SymbolIcon Symbol="Next" />
                         </Button>
                         <Button Command="{Binding ToggleRepeatCommand}" ToolTip.Tip="Toggle Repeat Mode">
-                            <ic:SymbolIcon Symbol="{Binding RepeatIcon}"/>
+                            <ic:SymbolIcon Symbol="{Binding RepeatIcon}" />
                         </Button>
                     </StackPanel>
 
@@ -88,6 +103,7 @@
 
             <!-- Volume -->
             <Grid Grid.Column="2"
+                  MinWidth="160"
                   HorizontalAlignment="Right"
                   VerticalAlignment="Center"
                   ColumnDefinitions="Auto,Auto,Auto"

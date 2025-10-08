@@ -1,5 +1,8 @@
-﻿using LibVLCSharp.Shared;
+﻿using Avalonia.Media.Imaging;
+using LibVLCSharp.Shared;
 using FluentAurora.Core.Logging;
+using TagLib;
+using File = System.IO.File;
 
 namespace FluentAurora.Core.Playback;
 
@@ -9,6 +12,7 @@ public class AudioPlayerService : IDisposable
     private readonly LibVLC _libVLC;
     private readonly MediaPlayer _mediaPlayer;
     private Media? _currentMedia;
+    public AudioMetadata? CurrentMetadata { get; private set; }
     public bool IsPlaying => _mediaPlayer.IsPlaying;
     public bool IsMediaReady { get; private set; }
     public bool IsLooping { get; set; } = true;
@@ -38,6 +42,7 @@ public class AudioPlayerService : IDisposable
     public event Action<int>? DurationChanged;
     public event Action? MediaReady;
     public event Action? MediaEnded;
+    public event Action<AudioMetadata>? MetadataLoaded;
 
     // Constructor
     public AudioPlayerService()
@@ -148,7 +153,10 @@ public class AudioPlayerService : IDisposable
 
             await _currentMedia.Parse(MediaParseOptions.ParseLocal);
             Logger.Debug("Media parsed successfully");
-
+            
+            CurrentMetadata = ExtractMetadata(_currentMedia, path);
+            MetadataLoaded?.Invoke(CurrentMetadata);
+            
             IsMediaReady = true;
             _mediaPlayer.Media = _currentMedia;
             MediaReady?.Invoke();
@@ -161,6 +169,55 @@ public class AudioPlayerService : IDisposable
             Logger.Error($"Failed to load or parse media file '{path}': {ex}");
             IsMediaReady = false;
         }
+    }
+
+    private AudioMetadata ExtractMetadata(Media media, string filePath)
+    {
+        AudioMetadata metadata = new AudioMetadata
+        {
+            FilePath = filePath,
+            Duration = media.Duration,
+        };
+
+        try
+        {
+            metadata.Title = media.Meta(MetadataType.Title) ?? string.Empty;
+            metadata.Artist = media.Meta(MetadataType.Artist) ?? string.Empty;
+            metadata.Album = media.Meta(MetadataType.Album) ?? string.Empty;
+            metadata.AlbumArtist = media.Meta(MetadataType.AlbumArtist) ?? string.Empty;
+            metadata.Genre = media.Meta(MetadataType.Genre) ?? string.Empty;
+            
+            // Extract album artwork
+            using TagLib.File? tagLibFile = TagLib.File.Create(filePath);
+            if (tagLibFile.Tag.Pictures?.Length > 0)
+            {
+                IPicture? image = tagLibFile.Tag.Pictures[0]; // First picture
+                byte[]? imageData = image?.Data.Data;
+                if (imageData is { Length: > 0 })
+                {
+                    try
+                    {
+                        using MemoryStream stream = new MemoryStream(imageData);
+                        metadata.AlbumArt = new Bitmap(stream);
+                        Logger.Debug($"Album artwork extracted ({imageData.Length} bytes, Type: {image?.Type})");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warning($"Failed to create artwork from data: {ex}");
+                    }
+                }
+            }
+            else
+            {
+                Logger.Debug("Couldn't find any embedded artwork");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Error extracting metadata: {ex}");
+        }
+        
+        return metadata;
     }
 
     public void Play()

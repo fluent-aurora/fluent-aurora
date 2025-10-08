@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -16,8 +17,11 @@ public partial class PlaybackControlViewModel : ViewModelBase
     private bool _isDragging = false;
     private int _seekPosition;
 
-    [ObservableProperty] private string songTitle = "No Song Selected";
-    [ObservableProperty] private string songArtist = "Artists";
+    [ObservableProperty] private AudioMetadata? currentMetadata;
+    public string SongTitle => CurrentMetadata?.DisplayTitle ?? "No Song Selected";
+    public string SongArtist => CurrentMetadata?.Artist ?? string.Empty;
+    public string SongAlbum => CurrentMetadata?.Album ?? string.Empty;
+    public Bitmap? SongArtwork => CurrentMetadata?.AlbumArt;
     [ObservableProperty] private int songDuration;
     [ObservableProperty] private int currentPosition;
     [ObservableProperty] private int displayPosition; // For showing while seeking
@@ -76,6 +80,18 @@ public partial class PlaybackControlViewModel : ViewModelBase
         _audioPlayerService.DurationChanged += durMs =>
         {
             Dispatcher.UIThread.Post(() => SongDuration = durMs);
+        };
+
+        _audioPlayerService.MetadataLoaded += metadata =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                CurrentMetadata = metadata;
+                OnPropertyChanged(nameof(SongTitle));
+                OnPropertyChanged(nameof(SongArtist));
+                OnPropertyChanged(nameof(SongAlbum));
+                OnPropertyChanged(nameof(SongArtwork));
+            });
         };
     }
 
@@ -194,7 +210,6 @@ public partial class PlaybackControlViewModel : ViewModelBase
         if (result.Count > 0)
         {
             string? filePath = result[0].Path.LocalPath;
-            SongTitle = System.IO.Path.GetFileNameWithoutExtension(filePath);
             await _audioPlayerService.PlayFileAsync(filePath);
         }
     }

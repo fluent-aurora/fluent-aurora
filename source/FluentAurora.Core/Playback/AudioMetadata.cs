@@ -1,7 +1,4 @@
-﻿using Avalonia.Media.Imaging;
-using NLog.LayoutRenderers.Wrappers;
-
-namespace FluentAurora.Core.Playback;
+﻿namespace FluentAurora.Core.Playback;
 
 public class AudioMetadata
 {
@@ -14,8 +11,8 @@ public class AudioMetadata
     public string Year { get; set; } = string.Empty;
     public int? TrackNumber { get; set; }
     public int? TrackTotal { get; set; }
-    public long Duration { get; set; }
-    public Bitmap? AlbumArt { get; set; }
+    public double? Duration { get; set; }
+    public byte[]? ArtworkData { get; set; }
     public string? FilePath { get; set; }
 
     // Methods

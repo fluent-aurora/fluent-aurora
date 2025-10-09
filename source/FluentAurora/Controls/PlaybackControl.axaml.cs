@@ -21,21 +21,35 @@ public partial class PlaybackControl : UserControl
         DataContext = _viewModel;
 
         // Wire up seeking events
-        if (this.FindControl<Slider>("ProgressSlider") is { } slider)
+        Slider? progressSlider = this.FindControl<Slider>("ProgressSlider");
+        if (progressSlider != null)
         {
-            slider.AddHandler(PointerPressedEvent, OnSliderPointerPressed, handledEventsToo: true);
-            slider.AddHandler(PointerMovedEvent, OnSliderPointerMoved, handledEventsToo: true);
-            slider.AddHandler(PointerReleasedEvent, OnSliderPointerReleased, handledEventsToo: true);
-            slider.AddHandler(PointerCaptureLostEvent, OnSliderPointerCaptureLost, handledEventsToo: true);
+            progressSlider.AddHandler(PointerPressedEvent, OnSliderPointerPressed, handledEventsToo: true);
+            progressSlider.AddHandler(PointerMovedEvent, OnSliderPointerMoved, handledEventsToo: true);
+            progressSlider.AddHandler(PointerReleasedEvent, OnSliderPointerReleased, handledEventsToo: true);
+            progressSlider.AddHandler(PointerCaptureLostEvent, OnSliderPointerCaptureLost, handledEventsToo: true);
         }
     }
 
     // Events
     private void OnSliderPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (sender is not Slider slider)
+        {
+            return;
+        }
+
         _pointerPressed = true;
-        _pressedPoint = e.GetPosition((Control?)sender);
+        _pressedPoint = e.GetPosition(slider);
         _viewModel?.PrepareForPotentialSeeking();
+
+        // For immediate click feedback calculate and apply the position
+        if (_viewModel != null && slider.Bounds.Width > 0)
+        {
+            double ratio = Math.Max(0, Math.Min(1, _pressedPoint.X / slider.Bounds.Width));
+            int targetPosition = (int)(ratio * _viewModel.SongDuration);
+            _viewModel.DisplayPosition = targetPosition;
+        }
     }
 
     private void OnSliderPointerMoved(object? sender, PointerEventArgs e)

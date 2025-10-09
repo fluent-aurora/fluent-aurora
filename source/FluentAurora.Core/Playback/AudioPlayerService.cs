@@ -1,36 +1,47 @@
-﻿using Avalonia.Media.Imaging;
-using LibVLCSharp.Shared;
-using FluentAurora.Core.Logging;
+﻿using FluentAurora.Core.Logging;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using TagLib;
-using File = System.IO.File;
 
 namespace FluentAurora.Core.Playback;
 
 public class AudioPlayerService : IDisposable
 {
     // Properties
-    private readonly LibVLC _libVLC;
-    private readonly MediaPlayer _mediaPlayer;
-    private Media? _currentMedia;
+    private IWavePlayer? _wavePlayer;
+    private AudioFileReader? _audioFileReader;
+    private VolumeSampleProvider? _volumeProvider;
+    private string? _currentFilePath;
+    private Timer? _positionTimer;
+    private bool _isDisposed;
+
     public AudioMetadata? CurrentMetadata { get; private set; }
-    public bool IsPlaying => _mediaPlayer.IsPlaying;
+    public bool IsPlaying { get; private set; }
     public bool IsMediaReady { get; private set; }
     public bool IsLooping { get; set; } = true;
 
+    private int _volume = 100;
+
     public int Volume
     {
-        get => _mediaPlayer.Volume;
+        get => _volume;
         set
         {
-            // Below 50%, compress way more
-            // Above 50%, expand faster
-            int adjusted = value switch
+            // Volume Curve
+            _volume = Math.Clamp(value, 0, 100);
+            float normalized = _volume / 100f;
+            float adjusted = _volume switch
             {
-                <= 50 => (int)(value * 0.6),
-                _ => (int)(30 + (value - 50) * 1.4)
+                <= 50 => normalized * 0.6f, // Softer curve below 50% volume
+                _ => 0.3f + (normalized - 0.5f) * 1.4f // Faster curve after 50% volume than linear curve
             };
-            _mediaPlayer.Volume = adjusted;
-            Logger.Trace($"Setting volume to {value}% (LibVLC internal: {adjusted}%)");
+
+            if (_volumeProvider != null)
+            {
+                _volumeProvider.Volume = adjusted;
+            }
+
+            Logger.Info($"Setting volume to {_volume}% (Internal: {(adjusted * 100)}%)");
         }
     }
 
@@ -47,85 +58,57 @@ public class AudioPlayerService : IDisposable
     // Constructor
     public AudioPlayerService()
     {
-        Logger.Info("Initializing AudioPlayerService");
-
-        try
-        {
-            LibVLCSharp.Shared.Core.Initialize();
-            Logger.Debug("LibVLC core initialized");
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Failed to initialize LibVLC core: {ex}");
-            throw;
-        }
-
-        _libVLC = new LibVLC();
-        _mediaPlayer = new MediaPlayer(_libVLC);
-        Logger.Debug("MediaPlayer and LibVLC instances created");
-
-        // Wire up events with logging
-        _mediaPlayer.Playing += (_, _) =>
-        {
-            Logger.Trace("MediaPlayer.Playing event triggered");
-            PlaybackStarted?.Invoke();
-        };
-
-        _mediaPlayer.Paused += (_, _) =>
-        {
-            Logger.Trace("MediaPlayer.Paused event triggered");
-            PlaybackPaused?.Invoke();
-        };
-
-        _mediaPlayer.Stopped += (_, _) =>
-        {
-            Logger.Trace("MediaPlayer.Stopped event triggered");
-            PlaybackStopped?.Invoke();
-        };
-
-        _mediaPlayer.TimeChanged += (_, e) =>
-        {
-            Logger.Trace($"Time changed to {e.Time} ms");
-            PositionChanged?.Invoke((int)e.Time);
-        };
-
-        _mediaPlayer.LengthChanged += (_, e) =>
-        {
-            Logger.Debug($"Media duration changed to {e.Length} ms");
-            DurationChanged?.Invoke((int)e.Length);
-        };
-
-        _mediaPlayer.EndReached += OnMediaEndReached;
-
+        Logger.Info("Initializing AudioPlayerService (NAudio)");
+        InitializeWavePlayer();
         Logger.Info("AudioPlayerService initialized successfully");
     }
 
-    // Events
-    private async void OnMediaEndReached(object? sender, EventArgs e)
+    private void InitializeWavePlayer()
     {
-        Logger.Info("Media playback ended");
-        MediaEnded?.Invoke();
-
-        if (IsLooping && IsMediaReady && _currentMedia != null)
+        try
         {
-            Logger.Debug("Looping enabled");
-            Logger.Debug("Restarting playback after 50ms delay...");
-            await Task.Delay(50);
+            _wavePlayer = new WaveOutEvent
+            {
+                DesiredLatency = 100
+            };
 
-            try
-            {
-                _mediaPlayer.Media = _currentMedia;
-                _mediaPlayer.Play();
-                Logger.Debug("Looped media restarted");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error($"Failed to restart media during loop: {ex}");
-            }
+            _wavePlayer.PlaybackStopped += OnPlaybackStopped;
+            Logger.Debug("WavePlayer initialized");
         }
-        else
+        catch (Exception ex)
         {
-            Logger.Debug($"Looping: {IsLooping}, MediaReady: {IsMediaReady}, CurrentMedia: {_currentMedia != null}");
+            Logger.Error($"Failed to initialize WavePlayer: {ex}");
+            throw;
+        }
+    }
+
+    private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
+    {
+        if (e.Exception != null)
+        {
+            Logger.Error($"Playback stopped with error: {e.Exception}");
+            return;
+        }
+
+        Logger.Info("Playback stopped");
+        IsPlaying = false;
+        PlaybackStopped?.Invoke();
+
+        // Check if the end of the file has been reached
+        if (_audioFileReader != null && _audioFileReader.Position >= _audioFileReader.Length - _audioFileReader.WaveFormat.AverageBytesPerSecond / 10) // Within 100ms of end
+        {
+            Logger.Info("Media playback ended");
+            MediaEnded?.Invoke();
+
+            if (IsLooping && IsMediaReady)
+            {
+                Logger.Debug("Looping enabled, restarting playback");
+                Task.Run(async () =>
+                {
+                    await Task.Delay(50);
+                    Play();
+                });
+            }
         }
     }
 
@@ -134,31 +117,43 @@ public class AudioPlayerService : IDisposable
     {
         Logger.Info($"PlayFileAsync called with path: {path}");
 
-        if (!File.Exists(path))
+        if (!System.IO.File.Exists(path) && !Uri.IsWellFormedUriString(path, UriKind.Absolute))
         {
-            Logger.Warning($"Media file not found: {path}");
+            Logger.Warning($"Media file not found or invalid URL: {path}");
             return;
         }
 
         Stop();
+        DisposeCurrentMedia();
         IsMediaReady = false;
-
-        _currentMedia?.Dispose();
-        Logger.Debug("Previous media disposed");
 
         try
         {
-            _currentMedia = new Media(_libVLC, new Uri(path));
-            Logger.Debug($"Media object created for: {path}");
+            _currentFilePath = path;
+            Logger.Debug($"Loading local file: {path}");
+            _audioFileReader = new AudioFileReader(path);
 
-            await _currentMedia.Parse(MediaParseOptions.ParseLocal);
-            Logger.Debug("Media parsed successfully");
-            
-            CurrentMetadata = ExtractMetadata(_currentMedia, path);
+            // Create volume provider
+            _volumeProvider = new VolumeSampleProvider(_audioFileReader)
+            {
+                Volume = _volume / 100f
+            };
+            Volume = _volume; // Re-apply volume with curve
+
+            // Initialize the wave player with the audio
+            _wavePlayer?.Init(_volumeProvider);
+
+            Logger.Info("Audio file loaded successfully");
+
+            // Extract metadata from the file
+            CurrentMetadata = await Task.Run(() => ExtractMetadata(path));
             MetadataLoaded?.Invoke(CurrentMetadata);
-            
+
+            // Duration notification (To update UI)
+            int durationMs = (int)(_audioFileReader.TotalTime.TotalMilliseconds);
+            DurationChanged?.Invoke(durationMs);
+
             IsMediaReady = true;
-            _mediaPlayer.Media = _currentMedia;
             MediaReady?.Invoke();
             Logger.Info("Media is ready (Invoking MediaReady event)");
 
@@ -166,143 +161,211 @@ public class AudioPlayerService : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.Error($"Failed to load or parse media file '{path}': {ex}");
+            Logger.Error($"Failed to load media file '{path}': {ex}");
             IsMediaReady = false;
         }
     }
 
-    private AudioMetadata ExtractMetadata(Media media, string filePath)
+    private AudioMetadata ExtractMetadata(string filePath)
     {
         AudioMetadata metadata = new AudioMetadata
         {
             FilePath = filePath,
-            Duration = media.Duration,
+            Duration = _audioFileReader?.TotalTime.TotalMilliseconds ?? 0
         };
 
         try
         {
-            metadata.Title = media.Meta(MetadataType.Title) ?? string.Empty;
-            metadata.Artist = media.Meta(MetadataType.Artist) ?? string.Empty;
-            metadata.Album = media.Meta(MetadataType.Album) ?? string.Empty;
-            metadata.AlbumArtist = media.Meta(MetadataType.AlbumArtist) ?? string.Empty;
-            metadata.Genre = media.Meta(MetadataType.Genre) ?? string.Empty;
-            
-            // Extract album artwork
             using TagLib.File? tagLibFile = TagLib.File.Create(filePath);
+
+            metadata.Title = tagLibFile.Tag.Title ?? Path.GetFileNameWithoutExtension(filePath);
+            metadata.Artist = tagLibFile.Tag.FirstPerformer ?? string.Empty;
+            metadata.Album = tagLibFile.Tag.Album ?? string.Empty;
+            metadata.AlbumArtist = tagLibFile.Tag.FirstAlbumArtist ?? string.Empty;
+            metadata.Genre = tagLibFile.Tag.FirstGenre ?? string.Empty;
+
+            // Extract album artwork
             if (tagLibFile.Tag.Pictures?.Length > 0)
             {
-                IPicture? image = tagLibFile.Tag.Pictures[0]; // First picture
+                IPicture? image = tagLibFile.Tag.Pictures[0];
                 byte[]? imageData = image?.Data.Data;
                 if (imageData is { Length: > 0 })
                 {
-                    try
-                    {
-                        using MemoryStream stream = new MemoryStream(imageData);
-                        metadata.AlbumArt = new Bitmap(stream);
-                        Logger.Debug($"Album artwork extracted ({imageData.Length} bytes, Type: {image?.Type})");
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warning($"Failed to create artwork from data: {ex}");
-                    }
+                    metadata.ArtworkData = imageData;
+                    Logger.Debug($"Album artwork extracted ({imageData.Length} bytes, Type: {image?.Type})");
                 }
             }
             else
             {
-                Logger.Debug("Couldn't find any embedded artwork");
+                Logger.Debug("No embedded artwork found");
             }
         }
         catch (Exception ex)
         {
             Logger.Error($"Error extracting metadata: {ex}");
+            metadata.Title = Path.GetFileNameWithoutExtension(filePath);
         }
-        
+
         return metadata;
     }
 
     public void Play()
     {
-        if (!IsMediaReady)
+        if (!IsMediaReady || _wavePlayer == null || _audioFileReader == null)
         {
             Logger.Warning("Play() called but media is not ready");
             return;
         }
 
         Logger.Info("Starting playback");
-        _mediaPlayer.Play();
+
+        // If at the end, restart from beginning
+        if (_audioFileReader.Position >= _audioFileReader.Length)
+        {
+            _audioFileReader.Position = 0;
+        }
+
+        _wavePlayer.Play();
+        IsPlaying = true;
+        PlaybackStarted?.Invoke();
+
+        // Start position update timer
+        StartPositionTimer();
     }
 
     public void Pause()
     {
+        if (_wavePlayer?.PlaybackState != PlaybackState.Playing)
+        {
+            Logger.Warning("Pause() called but not playing");
+            return;
+        }
+
         Logger.Info("Pausing playback");
-        _mediaPlayer.Pause();
+        _wavePlayer?.Pause();
+        IsPlaying = false;
+        PlaybackPaused?.Invoke();
+
+        StopPositionTimer();
     }
 
     public void Stop()
     {
         Logger.Info("Stopping playback");
-        _mediaPlayer.Stop();
-        IsMediaReady = false;
-        Logger.Debug("Playback stopped and media marked as not ready");
+
+        StopPositionTimer();
+        _wavePlayer?.Stop();
+
+        if (_audioFileReader != null)
+        {
+            _audioFileReader.Position = 0;
+        }
+
+        IsPlaying = false;
+        Logger.Debug("Playback stopped and position reset");
     }
 
     public void SeekTo(int positionMs)
     {
-        if (!IsMediaReady)
+        if (!IsMediaReady || _audioFileReader == null)
         {
             Logger.Warning("SeekTo() called but media is not ready");
             return;
         }
 
         Logger.Info($"Seeking to position: {positionMs}ms");
-        _mediaPlayer.Time = positionMs;
+
+        TimeSpan targetPosition = TimeSpan.FromMilliseconds(positionMs);
+        if (targetPosition > _audioFileReader.TotalTime)
+        {
+            targetPosition = _audioFileReader.TotalTime;
+        }
+        else if (targetPosition < TimeSpan.Zero)
+        {
+            targetPosition = TimeSpan.Zero;
+        }
+
+        // Stop position timer to avoid conflicts
+        bool wasPlaying = IsPlaying;
+        StopPositionTimer();
+
+        _audioFileReader.CurrentTime = targetPosition;
+        PositionChanged?.Invoke(positionMs);
+
+        // Resume position timer if the song is playing
+        if (wasPlaying)
+        {
+            StartPositionTimer();
+        }
     }
 
     public int GetCurrentPosition()
     {
-        return (int)_mediaPlayer.Time;
+        return (int)(_audioFileReader?.CurrentTime.TotalMilliseconds ?? 0);
     }
 
     public int GetDuration()
     {
-        return (int)_mediaPlayer.Length;
+        return (int)(_audioFileReader?.TotalTime.TotalMilliseconds ?? 0);
     }
 
-    public void Dispose()
+    private void StartPositionTimer()
     {
-        Logger.Info("Disposing AudioPlayerService");
+        StopPositionTimer();
+        _positionTimer = new Timer(_ =>
+        {
+            if (IsPlaying && _audioFileReader != null)
+            {
+                PositionChanged?.Invoke(GetCurrentPosition());
+            }
+        }, null, 0, 100); // Update every 100ms
+    }
 
+    private void StopPositionTimer()
+    {
+        _positionTimer?.Dispose();
+        _positionTimer = null;
+    }
+
+    private void DisposeCurrentMedia()
+    {
         try
         {
-            _mediaPlayer?.Stop();
-            _mediaPlayer?.Dispose();
-            Logger.Debug("MediaPlayer disposed");
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Error disposing MediaPlayer: {ex}");
-        }
-
-        try
-        {
-            _currentMedia?.Dispose();
+            _audioFileReader?.Dispose();
+            _audioFileReader = null;
+            _volumeProvider = null;
             Logger.Debug("Current media disposed");
         }
         catch (Exception ex)
         {
             Logger.Error($"Error disposing current media: {ex}");
         }
+    }
+
+    public void Dispose()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        Logger.Info("Disposing AudioPlayerService");
 
         try
         {
-            _libVLC?.Dispose();
-            Logger.Debug("LibVLC disposed");
+            StopPositionTimer();
+            _wavePlayer?.Stop();
+            _wavePlayer?.Dispose();
+            Logger.Debug("WavePlayer disposed");
         }
         catch (Exception ex)
         {
-            Logger.Error($"Error disposing LibVLC: {ex}");
+            Logger.Error($"Error disposing WavePlayer: {ex}");
         }
 
+        DisposeCurrentMedia();
+
+        _isDisposed = true;
         Logger.Info("AudioPlayerService disposed");
     }
 }

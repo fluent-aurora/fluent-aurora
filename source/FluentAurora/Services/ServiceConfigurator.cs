@@ -18,11 +18,15 @@ public static class ServiceConfigurator
         
         // ViewModels
         services.AddSingleton<MainWindowViewModel>();
-        services.AddTransient<PlaybackControlViewModel>();
+        services.AddSingleton<PlaybackControlViewModel>();
+        services.AddSingleton<ExtendedPlaybackControlViewModel>();
         
         // Views
         services.AddSingleton<MainWindow>();
         services.AddTransient<PlaybackControl>();
+        
+        // Services
+        services.AddSingleton<PlaybackControlService>();
         
         return services.BuildServiceProvider();
     }

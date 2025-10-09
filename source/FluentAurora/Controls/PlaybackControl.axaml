@@ -60,6 +60,11 @@
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 Spacing="15">
+                        <!-- Expand Button -->
+                        <Button Command="{Binding ToggleExpandCommand}"
+                                ToolTip.Tip="Expand Player">
+                            <ic:SymbolIcon Symbol="ChevronUp" />
+                        </Button>
                         <Button Command="{Binding OpenFileCommand}" ToolTip.Tip="Open Audio File">
                             <ic:SymbolIcon Symbol="FolderOpen" />
                         </Button>

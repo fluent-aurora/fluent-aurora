@@ -1,0 +1,256 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ic="using:FluentIcons.Avalonia.Fluent"
+             xmlns:converters="using:FluentAurora.Converters"
+             xmlns:controls="using:FluentAurora.Controls"
+             xmlns:vm="clr-namespace:FluentAurora.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700"
+             x:Class="FluentAurora.Controls.ExpandedPlaybackControl">
+    <Design.DataContext>
+        <vm:ExtendedPlaybackControlViewModel />
+    </Design.DataContext>
+    <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+            CornerRadius="12">
+        <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="40">
+
+            <!-- Header with close button -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+                <TextBlock Grid.Column="0"
+                           Text="Now Playing"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Opacity="0.7"
+                           VerticalAlignment="Center" />
+
+                <Button Grid.Column="1"
+                        Width="32"
+                        Height="32"
+                        Command="{Binding ToggleExpandCommand}"
+                        ToolTip.Tip="Minimize Player (Esc)">
+                    <ic:SymbolIcon Symbol="ChevronDown" FontSize="16" />
+                </Button>
+            </Grid>
+
+            <!-- Album Art and Info -->
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Spacing="30">
+
+                    <!-- Large Album Art with shadow -->
+                    <Border Width="400"
+                            Height="400"
+                            CornerRadius="12"
+                            HorizontalAlignment="Center"
+                            BoxShadow="0 8 32 0 #30000000"
+                            ClipToBounds="True">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                <GradientStop Color="#FF3D3D3D" Offset="0" />
+                                <GradientStop Color="#FF2D2D2D" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Grid>
+                            <!-- Placeholder icon (No Artwork) -->
+                            <ic:SymbolIcon Symbol="MusicNote2"
+                                           FontSize="64"
+                                           Opacity="0.3"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding SongArtwork, Converter={x:Static ObjectConverters.IsNull}}" />
+
+                            <!-- Artwork -->
+                            <Image Source="{Binding SongArtwork}"
+                                   Stretch="UniformToFill"
+                                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Song Info -->
+                    <StackPanel HorizontalAlignment="Center" Spacing="12" MaxWidth="500">
+                        <controls:ScrollingTextBlock Text="{Binding SongTitle, FallbackValue='No Track Playing'}"
+                                                     CenterText="True"
+                                                     ShowToolTip="True"
+                                                     FontWeight="Bold"
+                                                     FontSize="28"
+                                                     PauseBeforeScroll="3000"
+                                                     ScrollSpeed="25"
+                                                     ScrollGap="80"
+                                                     MaxWidth="500" />
+
+                        <controls:ScrollingTextBlock Text="{Binding SongArtist, FallbackValue='Unknown Artist'}"
+                                                     CenterText="True"
+                                                     ShowToolTip="True"
+                                                     FontWeight="SemiBold"
+                                                     FontSize="20"
+                                                     Opacity="0.8"
+                                                     PauseBeforeScroll="3000"
+                                                     ScrollSpeed="25"
+                                                     ScrollGap="80"
+                                                     MaxWidth="500" />
+
+                        <controls:ScrollingTextBlock Text="{Binding SongAlbum, FallbackValue='Unknown Album'}"
+                                                     CenterText="True"
+                                                     ShowToolTip="True"
+                                                     FontSize="16"
+                                                     Opacity="0.6"
+                                                     PauseBeforeScroll="3000"
+                                                     ScrollSpeed="25"
+                                                     ScrollGap="80"
+                                                     MaxWidth="500" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Progress Section -->
+            <StackPanel Grid.Row="2" Spacing="8" Margin="0,20,0,0">
+                <!-- Progress Bar -->
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="15">
+                    <TextBlock Grid.Column="0"
+                               FontSize="13"
+                               FontWeight="Medium"
+                               Opacity="0.8"
+                               VerticalAlignment="Center"
+                               MinWidth="45"
+                               Text="{Binding DisplayPosition, Converter={x:Static converters:PositionToTimeConverter.Instance}}" />
+
+                    <Slider Grid.Column="1"
+                            x:Name="ExpandedProgressSlider"
+                            Minimum="0"
+                            Maximum="{Binding SongDuration}"
+                            Value="{Binding DisplayPosition, Mode=TwoWay}"
+                            UseLayoutRounding="False"
+                            VerticalAlignment="Center">
+                        <ToolTip.Tip>
+                            <StackPanel>
+                                <TextBlock Text="{Binding DisplayPosition, Converter={x:Static converters:PositionToTimeConverter.Instance}}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="Click or drag to seek"
+                                           FontSize="11"
+                                           Opacity="0.7" />
+                            </StackPanel>
+                        </ToolTip.Tip>
+                    </Slider>
+
+                    <TextBlock Grid.Column="2"
+                               FontSize="13"
+                               FontWeight="Medium"
+                               Opacity="0.8"
+                               VerticalAlignment="Center"
+                               MinWidth="45"
+                               Text="{Binding SongDuration, Converter={x:Static converters:PositionToTimeConverter.Instance}}" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Controls Section -->
+            <StackPanel Grid.Row="3"
+                        HorizontalAlignment="Center"
+                        Spacing="24"
+                        Margin="0,20,0,0">
+
+                <!-- Main Playback Controls -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Spacing="16">
+
+                    <!-- Shuffle -->
+                    <Button Width="44"
+                            Height="44"
+                            ToolTip.Tip="Shuffle">
+                        <ic:SymbolIcon Symbol="ArrowShuffle" FontSize="20" />
+                    </Button>
+
+                    <!-- Previous -->
+                    <Button Width="48"
+                            Height="48"
+                            ToolTip.Tip="Previous Track">
+                        <ic:SymbolIcon Symbol="Previous" FontSize="20" />
+                    </Button>
+
+                    <!-- Play/Pause -->
+                    <Button Command="{Binding TogglePlayCommand}"
+                            Width="64"
+                            Height="64"
+                            CornerRadius="32">
+                        <ic:SymbolIcon Symbol="{Binding PlayPauseIcon}" FontSize="28" />
+                    </Button>
+
+                    <!-- Next -->
+                    <Button Width="48"
+                            Height="48"
+                            ToolTip.Tip="Next Track">
+                        <ic:SymbolIcon Symbol="Next" FontSize="20" />
+                    </Button>
+
+                    <!-- Repeat -->
+                    <Button Width="44"
+                            Height="44"
+                            Command="{Binding ToggleRepeatCommand}">
+                        <ic:SymbolIcon Symbol="{Binding RepeatIcon}" FontSize="20" />
+                    </Button>
+                </StackPanel>
+
+                <!-- Secondary Controls -->
+                <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16,12">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+
+                        <!-- Left controls -->
+                        <StackPanel Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    Spacing="12">
+                            <Button Command="{Binding OpenFileCommand}"
+                                    ToolTip.Tip="Open File"
+                                    AutomationProperties.Name="Open File">
+                                <ic:SymbolIcon Symbol="FolderOpen" FontSize="18" />
+                            </Button>
+
+                            <Button ToolTip.Tip="Show Playlist">
+                                <ic:SymbolIcon Symbol="List" FontSize="18" />
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Center spacing -->
+                        <Panel Grid.Column="1" />
+
+                        <!-- Volume Control -->
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    Spacing="10">
+                            <Button ToolTip.Tip="Mute/Unmute">
+                                <ic:SymbolIcon Symbol="{Binding VolumeIcon}" FontSize="18" />
+                            </Button>
+
+                            <Slider Width="120"
+                                    Minimum="0"
+                                    Maximum="100"
+                                    Value="{Binding CurrentVolume}"
+                                    VerticalAlignment="Center">
+                                <ToolTip.Tip>
+                                    <TextBlock>
+                                        <TextBlock.Text>
+                                            <MultiBinding StringFormat="Volume: {0}%">
+                                                <Binding Path="CurrentVolume" />
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                </ToolTip.Tip>
+                            </Slider>
+
+                            <TextBlock Text="{Binding CurrentVolume, StringFormat='{}{0}%'}"
+                                       FontSize="12"
+                                       MinWidth="35"
+                                       Opacity="0.7"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

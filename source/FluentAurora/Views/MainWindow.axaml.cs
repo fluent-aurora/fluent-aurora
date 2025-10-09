@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using FluentAurora.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FluentAurora.Views;
 
@@ -8,11 +9,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-    }
-    
-    public MainWindow(MainWindowViewModel vm)
-    {
-        InitializeComponent();
-        DataContext = vm;
+        DataContext = App.Services?.GetRequiredService<MainWindowViewModel>();
     }
 }

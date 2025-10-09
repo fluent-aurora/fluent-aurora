@@ -10,7 +10,7 @@
         x:Class="FluentAurora.Views.MainWindow"
         Icon="/Assets/icon.ico"
         Title="Fluent Aurora"
-        MinHeight="100"
+        MinHeight="980"
         MinWidth="810"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="48">
@@ -68,13 +68,6 @@
                                OpenPaneLength="150">
                 <!-- Navigation Menu Items -->
                 <ui:NavigationView.MenuItems>
-                    <ui:NavigationViewItem Content="Now Playing"
-                                           Tag="NowPlaying">
-                        <ui:NavigationViewItem.IconSource>
-                            <ui:SymbolIconSource Symbol="Play" />
-                        </ui:NavigationViewItem.IconSource>
-                    </ui:NavigationViewItem>
-
                     <ui:NavigationViewItem Content="Library"
                                            Tag="Library">
                         <ui:NavigationViewItem.IconSource>
@@ -93,6 +86,13 @@
                 <custom:PlaybackControl VerticalAlignment="Bottom"
                                         Height="100" />
             </Grid>
+
+            <!-- Expanded Playback Overlay -->
+            <Panel Grid.RowSpan="2"
+                   IsVisible="{Binding PlaybackControlService.IsExpanded}"
+                   ZIndex="1000">
+                <custom:ExpandedPlaybackControl x:Name="ExpandedPlaybackControl" />
+            </Panel>
         </Grid>
     </Grid>
 </Window>

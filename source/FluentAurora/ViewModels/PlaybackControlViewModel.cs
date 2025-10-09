@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FluentAurora.Core.Logging;
 using FluentAurora.Core.Playback;
+using FluentAurora.Services;
 
 namespace FluentAurora.ViewModels;
 
@@ -17,6 +18,7 @@ public partial class PlaybackControlViewModel : ViewModelBase
 {
     // Properties
     private readonly AudioPlayerService _audioPlayerService;
+    private readonly PlaybackControlService _playbackControlService;
     private bool _isUserSeeking = false;
     private bool _isDragging = false;
     private int _seekPosition;
@@ -55,8 +57,9 @@ public partial class PlaybackControlViewModel : ViewModelBase
     };
 
     // Constructor
-    public PlaybackControlViewModel(AudioPlayerService audioPlayerService)
+    public PlaybackControlViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService)
     {
+        _playbackControlService = playbackControlService;
         _audioPlayerService = audioPlayerService;
         _audioPlayerService.Volume = CurrentVolume;
 
@@ -230,6 +233,12 @@ public partial class PlaybackControlViewModel : ViewModelBase
             // Re-enable position updating
             _suppressPositionUpdate = false;
         }
+    }
+
+    [RelayCommand]
+    private void ToggleExpand()
+    {
+        _playbackControlService.ToggleExpanded();
     }
 
     [RelayCommand]

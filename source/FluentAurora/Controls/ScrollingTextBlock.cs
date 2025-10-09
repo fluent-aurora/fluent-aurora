@@ -18,6 +18,7 @@ public class ScrollingTextBlock : Control
     private FormattedText? _formattedText;
 
     public static readonly StyledProperty<string> TextProperty = AvaloniaProperty.Register<ScrollingTextBlock, string>(nameof(Text), string.Empty);
+    public static readonly StyledProperty<bool> CenterTextProperty = AvaloniaProperty.Register<ScrollingTextBlock, bool>(nameof(CenterText), false);
     public static readonly StyledProperty<double> FontSizeProperty = TextBlock.FontSizeProperty.AddOwner<ScrollingTextBlock>();
     public static readonly StyledProperty<FontWeight> FontWeightProperty = TextBlock.FontWeightProperty.AddOwner<ScrollingTextBlock>();
     public static readonly StyledProperty<FontFamily> FontFamilyProperty = TextBlock.FontFamilyProperty.AddOwner<ScrollingTextBlock>();
@@ -32,6 +33,12 @@ public class ScrollingTextBlock : Control
     {
         get => GetValue(TextProperty);
         set => SetValue(TextProperty, value);
+    }
+
+    public bool CenterText
+    {
+        get => GetValue(CenterTextProperty);
+        set => SetValue(CenterTextProperty, value);
     }
 
     public double FontSize
@@ -157,7 +164,7 @@ public class ScrollingTextBlock : Control
         }
         Typeface typeface = new Typeface(FontFamily, FontStyle, FontWeight);
         IBrush foreground = Foreground ?? new SolidColorBrush(Colors.White);
-        
+
         _formattedText = new FormattedText(Text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, FontSize, foreground);
         _textWidth = _formattedText.Width;
         _needsScrolling = _textWidth > Bounds.Width;
@@ -245,7 +252,10 @@ public class ScrollingTextBlock : Control
             else
             {
                 // Center the text if there's no scrolling
-                context.DrawText(_formattedText, new Point(0, yPos));
+                double xPos = CenterText
+                    ? (Bounds.Width - _formattedText.Width) / 2 // centered
+                    : 0; // left-aligned
+                context.DrawText(_formattedText, new Point(xPos, yPos));
             }
         }
     }

@@ -1,11 +1,14 @@
+using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using FluentAurora.Services;
 using FluentAurora.ViewModels;
 using FluentAurora.Views;
+using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using Logger = FluentAurora.Core.Logging.Logger;
 
@@ -14,6 +17,7 @@ namespace FluentAurora;
 public partial class App : Application
 {
     public static Window? MainWindow => Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null;
+    public static IServiceProvider? Services { get; private set; }
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -26,10 +30,10 @@ public partial class App : Application
             // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
-            MainWindow mainWindow = new MainWindow
-            {
-                DataContext = new MainWindowViewModel(),
-            };
+
+            Services = ServiceConfigurator.ConfigureServices();
+
+            MainWindow mainWindow = Services.GetRequiredService<MainWindow>();
 
             mainWindow.Opened += (_, _) =>
             {
@@ -44,6 +48,7 @@ public partial class App : Application
             {
                 Logger.Shutdown();
             };
+            
             desktop.MainWindow = mainWindow;
         }
 

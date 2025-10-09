@@ -3,13 +3,14 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using FluentAurora.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FluentAurora.Controls;
 
 public partial class PlaybackControl : UserControl
 {
     // Properties
-    private PlaybackControlViewModel? _viewModel;
+    private readonly PlaybackControlViewModel? _viewModel;
     private bool _pointerPressed = false;
     private Point _pressedPoint;
 
@@ -17,7 +18,7 @@ public partial class PlaybackControl : UserControl
     public PlaybackControl()
     {
         InitializeComponent();
-        _viewModel = new PlaybackControlViewModel();
+        _viewModel = App.Services?.GetRequiredService<PlaybackControlViewModel>();
         DataContext = _viewModel;
 
         // Wire up seeking events

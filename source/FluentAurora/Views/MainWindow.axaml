@@ -8,7 +8,6 @@
         mc:Ignorable="d"
         d:DesignWidth="1200" d:DesignHeight="700"
         x:Class="FluentAurora.Views.MainWindow"
-        x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/icon.ico"
         Title="Fluent Aurora"
         MinHeight="100"

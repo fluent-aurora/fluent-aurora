@@ -55,9 +55,9 @@ public partial class PlaybackControlViewModel : ViewModelBase
     };
 
     // Constructor
-    public PlaybackControlViewModel()
+    public PlaybackControlViewModel(AudioPlayerService audioPlayerService)
     {
-        _audioPlayerService = new AudioPlayerService();
+        _audioPlayerService = audioPlayerService;
         _audioPlayerService.Volume = CurrentVolume;
 
         _audioPlayerService.PlaybackStarted += () =>

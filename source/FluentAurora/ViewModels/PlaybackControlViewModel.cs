@@ -67,8 +67,16 @@ public partial class PlaybackControlViewModel : ViewModelBase
         {
             Dispatcher.UIThread.Post(() => IsPlaying = true);
         };
-        _audioPlayerService.PlaybackPaused += () => Dispatcher.UIThread.Post(() => IsPlaying = false);
-        _audioPlayerService.PlaybackStopped += () => Dispatcher.UIThread.Post(() => IsPlaying = false);
+
+        _audioPlayerService.PlaybackPaused += () =>
+        {
+            Dispatcher.UIThread.Post(() => IsPlaying = false);
+        };
+
+        _audioPlayerService.PlaybackStopped += () =>
+        {
+            Dispatcher.UIThread.Post(() => IsPlaying = false);
+        };
         _audioPlayerService.PositionChanged += posMs =>
         {
             Dispatcher.UIThread.Post(() =>
@@ -119,14 +127,6 @@ public partial class PlaybackControlViewModel : ViewModelBase
     partial void OnIsPlayingChanged(bool value)
     {
         OnPropertyChanged(nameof(PlayPauseIcon));
-        if (value)
-        {
-            _audioPlayerService.Play();
-        }
-        else
-        {
-            _audioPlayerService.Pause();
-        }
     }
 
     partial void OnRepeatModeChanged(RepeatMode value)
@@ -248,7 +248,14 @@ public partial class PlaybackControlViewModel : ViewModelBase
     {
         if (_audioPlayerService.IsMediaReady)
         {
-            IsPlaying = !IsPlaying;
+            if (_audioPlayerService.IsPlaying)
+            {
+                _audioPlayerService.Pause();
+            }
+            else
+            {
+                _audioPlayerService.Play();
+            }
         }
         else
         {

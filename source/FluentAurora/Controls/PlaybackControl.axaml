@@ -87,7 +87,8 @@
                             Width="400"
                             Minimum="0"
                             Maximum="{Binding SongDuration}"
-                            Value="{Binding DisplayPosition, Mode=TwoWay}">
+                            Value="{Binding DisplayPosition, Mode=TwoWay}"
+                            UseLayoutRounding="False">
                         <ToolTip.Tip>
                             <TextBlock Text="{Binding DisplayPosition, Converter={x:Static converters:PositionToTimeConverter.Instance}}" />
                         </ToolTip.Tip>

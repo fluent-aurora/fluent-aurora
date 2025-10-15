@@ -92,6 +92,8 @@ public partial class PlaybackControlViewModel : ViewModelBase
             Dispatcher.UIThread.Post(() =>
             {
                 CurrentMetadata = metadata;
+                SongArtwork?.Dispose();
+                SongArtwork = null;
                 if (CurrentMetadata.ArtworkData != null)
                 {
                     try

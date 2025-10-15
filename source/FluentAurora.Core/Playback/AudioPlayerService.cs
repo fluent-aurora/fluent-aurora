@@ -42,6 +42,8 @@ public class AudioPlayerService : IDisposable
             }
 
             Logger.Info($"Setting volume to {_volume}% (Internal: {(adjusted * 100)}%)");
+            
+            VolumeChanged?.Invoke(_volume);
         }
     }
 
@@ -51,6 +53,7 @@ public class AudioPlayerService : IDisposable
     public event Action? PlaybackStopped;
     public event Action<int>? PositionChanged;
     public event Action<int>? DurationChanged;
+    public event Action<int>? VolumeChanged;
     public event Action? MediaReady;
     public event Action? MediaEnded;
     public event Action<AudioMetadata>? MetadataLoaded;

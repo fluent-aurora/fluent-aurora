@@ -95,6 +95,15 @@ public partial class PlaybackControlViewModel : ViewModelBase
             Dispatcher.UIThread.Post(() => SongDuration = durMs);
         };
 
+        _audioPlayerService.VolumeChanged += volume =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                CurrentVolume = volume;
+                OnPropertyChanged(nameof(VolumeIcon));
+            });
+        };
+
         _audioPlayerService.MetadataLoaded += metadata =>
         {
             Dispatcher.UIThread.Post(() =>

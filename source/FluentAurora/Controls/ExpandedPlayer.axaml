@@ -7,9 +7,9 @@
              xmlns:controls="using:FluentAurora.Controls"
              xmlns:vm="clr-namespace:FluentAurora.ViewModels"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700"
-             x:Class="FluentAurora.Controls.ExpandedPlaybackControl">
+             x:Class="FluentAurora.Controls.ExpandedPlayer">
     <Design.DataContext>
-        <vm:ExtendedPlaybackControlViewModel />
+        <vm:ExpandedPlayerViewModel />
     </Design.DataContext>
     <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
         <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="40,10,40,20">

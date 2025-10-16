@@ -82,14 +82,14 @@
             </ui:NavigationView>
 
             <!-- Playback Control -->
-            <custom:PlaybackControl VerticalAlignment="Bottom"
+            <custom:CompactPlayer VerticalAlignment="Bottom"
                                     Height="100" />
 
             <!-- Expanded Playback Overlay -->
             <Panel Grid.RowSpan="2"
                    IsVisible="{Binding PlaybackControlService.IsExpanded}"
                    ZIndex="1000">
-                <custom:ExpandedPlaybackControl x:Name="ExpandedPlaybackControl" />
+                <custom:ExpandedPlayer x:Name="ExpandedPlaybackControl" />
             </Panel>
         </Grid>
     </Grid>

@@ -8,12 +8,12 @@
              xmlns:converters="using:FluentAurora.Converters"
              xmlns:controls="using:FluentAurora.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="100"
-             x:Class="FluentAurora.Controls.PlaybackControl">
+             x:Class="FluentAurora.Controls.CompactPlayer">
     <UserControl.Resources>
         <converters:PositionToTimeConverter x:Key="TimeConverter" />
     </UserControl.Resources>
     <Design.DataContext>
-        <vm:PlaybackControlViewModel />
+        <vm:CompactPlayerViewModel />
     </Design.DataContext>
     <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
             BorderThickness="0,1,0,0"

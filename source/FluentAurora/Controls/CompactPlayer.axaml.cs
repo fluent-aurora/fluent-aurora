@@ -7,21 +7,22 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FluentAurora.Controls;
 
-public partial class ExpandedPlaybackControl : UserControl
+public partial class CompactPlayer : UserControl
 {
     // Properties
-    private readonly ExtendedPlaybackControlViewModel? _viewModel;
+    private readonly CompactPlayerViewModel? _viewModel;
     private bool _pointerPressed = false;
     private Point _pressedPoint;
 
-    public ExpandedPlaybackControl()
+    // Constructors
+    public CompactPlayer()
     {
         InitializeComponent();
-        _viewModel = App.Services?.GetRequiredService<ExtendedPlaybackControlViewModel>();
+        _viewModel = App.Services?.GetRequiredService<CompactPlayerViewModel>();
         DataContext = _viewModel;
 
         // Wire up seeking events
-        Slider? progressSlider = this.FindControl<Slider>("ExpandedProgressSlider");
+        Slider? progressSlider = this.FindControl<Slider>("ProgressSlider");
         if (progressSlider != null)
         {
             progressSlider.AddHandler(PointerPressedEvent, OnSliderPointerPressed, handledEventsToo: true);

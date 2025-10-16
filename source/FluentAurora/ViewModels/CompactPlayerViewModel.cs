@@ -14,7 +14,7 @@ using FluentAurora.Services;
 
 namespace FluentAurora.ViewModels;
 
-public partial class PlaybackControlViewModel : ViewModelBase
+public partial class CompactPlayerViewModel : ViewModelBase
 {
     // Properties
     private readonly AudioPlayerService _audioPlayerService;
@@ -57,7 +57,7 @@ public partial class PlaybackControlViewModel : ViewModelBase
     };
 
     // Constructor
-    public PlaybackControlViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService)
+    public CompactPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService)
     {
         _playbackControlService = playbackControlService;
         _audioPlayerService = audioPlayerService;

@@ -17,10 +17,10 @@ public static class ServiceConfigurator
         services.AddSingleton<AudioPlayerService>(); // Audio Player
         
         // Controls
-        services.AddTransient<PlaybackControl>();
-        services.AddSingleton<PlaybackControlViewModel>();
-        services.AddTransient<ExpandedPlaybackControl>();
-        services.AddSingleton<ExtendedPlaybackControlViewModel>();
+        services.AddTransient<CompactPlayer>();
+        services.AddSingleton<CompactPlayerViewModel>();
+        services.AddTransient<ExpandedPlayer>();
+        services.AddSingleton<ExpandedPlayerViewModel>();
         
         // Windows
         services.AddSingleton<MainWindow>();

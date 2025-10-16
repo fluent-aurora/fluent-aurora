@@ -177,6 +177,7 @@
                         Minimum="0"
                         Maximum="100"
                         Value="{Binding CurrentVolume}"
+                        UseLayoutRounding="False"
                         VerticalAlignment="Center">
                     <ToolTip.Tip>
                         <TextBlock Text="{Binding CurrentVolume, StringFormat='Volume: {0}%'}" />

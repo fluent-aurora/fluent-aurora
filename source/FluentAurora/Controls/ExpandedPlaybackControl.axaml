@@ -24,10 +24,10 @@
                            VerticalAlignment="Center" />
 
                 <Button Grid.Column="1"
-                        Width="32"
+                        Width="40"
                         Height="32"
                         Command="{Binding ToggleExpandCommand}"
-                        ToolTip.Tip="Minimize Player (Esc)">
+                        ToolTip.Tip="Minimize Player">
                     <ic:SymbolIcon Symbol="ChevronDown" FontSize="16" />
                 </Button>
             </Grid>
@@ -229,6 +229,7 @@
                                     Minimum="0"
                                     Maximum="100"
                                     Value="{Binding CurrentVolume}"
+                                    UseLayoutRounding="False"
                                     VerticalAlignment="Center">
                                 <ToolTip.Tip>
                                     <TextBlock>

@@ -11,7 +11,7 @@
         Icon="/Assets/icon.ico"
         Title="Fluent Aurora"
         MinHeight="{Binding MinWindowHeight}"
-        MinWidth="810"
+        MinWidth="900"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="48">
     <Design.DataContext>

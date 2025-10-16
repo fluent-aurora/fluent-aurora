@@ -75,17 +75,15 @@
                         </ui:NavigationViewItem.IconSource>
                     </ui:NavigationViewItem>
                 </ui:NavigationView.MenuItems>
+                <ui:NavigationView.Content>
+                    <!-- Content Player -->
+                    <ui:Frame x:Name="ContentFrame" />
+                </ui:NavigationView.Content>
             </ui:NavigationView>
 
-            <!-- Content -->
-            <Grid>
-                <!-- Content Player -->
-                <ui:Frame x:Name="ContentFrame" />
-
-                <!-- Playback Control -->
-                <custom:PlaybackControl VerticalAlignment="Bottom"
-                                        Height="100" />
-            </Grid>
+            <!-- Playback Control -->
+            <custom:PlaybackControl VerticalAlignment="Bottom"
+                                    Height="100" />
 
             <!-- Expanded Playback Overlay -->
             <Panel Grid.RowSpan="2"

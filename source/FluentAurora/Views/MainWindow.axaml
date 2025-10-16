@@ -65,7 +65,8 @@
         <Grid Grid.Row="1">
             <!-- NavigationView -->
             <ui:NavigationView AlwaysShowHeader="False"
-                               OpenPaneLength="150">
+                               OpenPaneLength="150"
+                               ItemInvoked="NavigationView_OnItemInvoked">
                 <!-- Navigation Menu Items -->
                 <ui:NavigationView.MenuItems>
                     <ui:NavigationViewItem Content="Library"
@@ -83,7 +84,7 @@
 
             <!-- Playback Control -->
             <custom:CompactPlayer VerticalAlignment="Bottom"
-                                    Height="100" />
+                                  Height="100" />
 
             <!-- Expanded Playback Overlay -->
             <Panel Grid.RowSpan="2"

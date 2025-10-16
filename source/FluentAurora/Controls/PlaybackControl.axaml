@@ -26,19 +26,30 @@
                         CornerRadius="4"
                         Background="#FF2D2D2D"
                         Margin="0,0,15,0">
-                    <Image Source="{Binding SongArtwork}"
-                           Stretch="UniformToFill" />
+                    <Grid>
+                        <!-- Placeholder icon (No Artwork) -->
+                        <ic:SymbolIcon Symbol="MusicNote2"
+                                       FontSize="20"
+                                       Opacity="0.3"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       IsVisible="{Binding SongArtwork, Converter={x:Static ObjectConverters.IsNull}}" />
+
+                        <!-- Artwork -->
+                        <Image Source="{Binding SongArtwork}"
+                               Stretch="UniformToFill" />
+                    </Grid>
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <controls:ScrollingTextBlock Text="{Binding SongTitle}" 
+                    <controls:ScrollingTextBlock Text="{Binding SongTitle, FallbackValue='No Track Playing'}"
                                                  ShowToolTip="True"
-                                                 FontWeight="SemiBold" 
+                                                 FontWeight="SemiBold"
                                                  FontSize="14"
                                                  PauseBeforeScroll="2000"
                                                  ScrollSpeed="30"
                                                  ScrollGap="50" />
-        
-                    <controls:ScrollingTextBlock Text="{Binding SongArtist}"
+
+                    <controls:ScrollingTextBlock Text="{Binding SongArtist, FallbackValue='Unknown Artist'}"
                                                  ShowToolTip="True"
                                                  Opacity="0.7"
                                                  FontSize="12"
@@ -59,85 +70,151 @@
                     <!-- Button row -->
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Center"
-                                Spacing="15">
+                                Spacing="12">
+                        <Button Command="{Binding OpenFileCommand}"
+                                Width="40"
+                                Height="32"
+                                ToolTip.Tip="Open File"
+                                AutomationProperties.Name="Open File">
+                            <ic:SymbolIcon Symbol="FolderOpen" FontSize="16" />
+                        </Button>
+
+                        <!-- Shuffle Button -->
+                        <Button Width="40"
+                                Height="32"
+                                ToolTip.Tip="Shuffle">
+                            <ic:SymbolIcon Symbol="ArrowShuffle" FontSize="16" />
+                        </Button>
+
+                        <!-- Previous -->
+                        <Button Width="40"
+                                Height="32"
+                                ToolTip.Tip="Previous Track">
+                            <ic:SymbolIcon Symbol="Previous" FontSize="16" />
+                        </Button>
+
+                        <!-- Play/Pause -->
+                        <Button Command="{Binding TogglePlayCommand}"
+                                Width="44"
+                                Height="40"
+                                CornerRadius="20">
+                            <ic:SymbolIcon Symbol="{Binding PlayPauseIcon}" FontSize="18" />
+                        </Button>
+
+                        <!-- Next -->
+                        <Button Width="40"
+                                Height="32"
+                                ToolTip.Tip="Next Track">
+                            <ic:SymbolIcon Symbol="Next" FontSize="16" />
+                        </Button>
+
+                        <!-- Repeat -->
+                        <Button Width="40"
+                                Height="32"
+                                Command="{Binding ToggleRepeatCommand}"
+                                ToolTip.Tip="Toggle Repeat Mode">
+                            <ic:SymbolIcon Symbol="{Binding RepeatIcon}" FontSize="16" />
+                        </Button>
+
                         <!-- Expand Button -->
                         <Button Command="{Binding ToggleExpandCommand}"
+                                Width="40"
+                                Height="32"
                                 ToolTip.Tip="Expand Player">
-                            <ic:SymbolIcon Symbol="ChevronUp" />
-                        </Button>
-                        <Button Command="{Binding OpenFileCommand}" ToolTip.Tip="Open Audio File">
-                            <ic:SymbolIcon Symbol="FolderOpen" />
-                        </Button>
-                        <Button>
-                            <ic:SymbolIcon Symbol="Previous" />
-                        </Button>
-                        <Button Command="{Binding TogglePlayCommand}">
-                            <ic:SymbolIcon Symbol="{Binding PlayPauseIcon}" />
-                        </Button>
-                        <Button>
-                            <ic:SymbolIcon Symbol="Next" />
-                        </Button>
-                        <Button Command="{Binding ToggleRepeatCommand}" ToolTip.Tip="Toggle Repeat Mode">
-                            <ic:SymbolIcon Symbol="{Binding RepeatIcon}" />
+                            <ic:SymbolIcon Symbol="ChevronUp" FontSize="16" />
                         </Button>
                     </StackPanel>
 
-                    <!-- Progress slider -->
-                    <Slider x:Name="ProgressSlider"
-                            Width="400"
-                            Minimum="0"
-                            Maximum="{Binding SongDuration}"
-                            Value="{Binding DisplayPosition, Mode=TwoWay}"
-                            UseLayoutRounding="False">
-                        <ToolTip.Tip>
-                            <TextBlock Text="{Binding DisplayPosition, Converter={x:Static converters:PositionToTimeConverter.Instance}}" />
-                        </ToolTip.Tip>
-                    </Slider>
-                    <TextBlock FontSize="12"
-                               Opacity="0.7"
-                               HorizontalAlignment="Center"
-                               Margin="-12">
-                        <TextBlock.Text>
-                            <MultiBinding Converter="{x:Static converters:PositionToTimeConverter.Instance}">
-                                <Binding Path="DisplayPosition" />
-                                <Binding Path="SongDuration" />
-                            </MultiBinding>
-                        </TextBlock.Text>
-                    </TextBlock>
+                    <!-- Progress slider with time indicators -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Width="400">
+                        <TextBlock Grid.Column="0"
+                                   FontSize="11"
+                                   FontWeight="Medium"
+                                   Opacity="0.8"
+                                   VerticalAlignment="Center"
+                                   MinWidth="35"
+                                   Text="{Binding DisplayPosition, Converter={x:Static converters:PositionToTimeConverter.Instance}}" />
+
+                        <Slider Grid.Column="1"
+                                x:Name="ProgressSlider"
+                                Minimum="0"
+                                Maximum="{Binding SongDuration}"
+                                Value="{Binding DisplayPosition, Mode=TwoWay}"
+                                UseLayoutRounding="False"
+                                VerticalAlignment="Center">
+                            <ToolTip.Tip>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding DisplayPosition, Converter={x:Static converters:PositionToTimeConverter.Instance}}"
+                                               FontWeight="SemiBold" />
+                                    <TextBlock Text="Click or drag to seek"
+                                               FontSize="11"
+                                               Opacity="0.7" />
+                                </StackPanel>
+                            </ToolTip.Tip>
+                        </Slider>
+
+                        <TextBlock Grid.Column="2"
+                                   FontSize="11"
+                                   FontWeight="Medium"
+                                   Opacity="0.8"
+                                   VerticalAlignment="Center"
+                                   MinWidth="35"
+                                   Text="{Binding SongDuration, Converter={x:Static converters:PositionToTimeConverter.Instance}}" />
+                    </Grid>
                 </StackPanel>
             </Grid>
 
-            <!-- Volume -->
+            <!-- Volume and Secondary Controls -->
             <Grid Grid.Column="2"
-                  MinWidth="160"
+                  MinWidth="200"
                   HorizontalAlignment="Right"
                   VerticalAlignment="Center"
-                  ColumnDefinitions="Auto,Auto,Auto"
-                  ColumnSpacing="10">
-                <!-- Icon -->
-                <ic:SymbolIcon Symbol="{Binding VolumeIcon}"
-                               Grid.Column="0"
-                               VerticalAlignment="Center" />
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="8">
 
-                <!-- Slider -->
-                <Slider Grid.Column="1"
-                        Width="100"
-                        Minimum="0"
-                        Maximum="100"
-                        Value="{Binding CurrentVolume}"
-                        VerticalAlignment="Center">
-                    <ToolTip.Tip>
-                        <TextBlock Text="{Binding CurrentVolume, StringFormat='{}{0}%'}" />
-                    </ToolTip.Tip>
-                </Slider>
+                <!-- Secondary Controls -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                    <Button Width="40"
+                            Height="32"
+                            ToolTip.Tip="Show Playlist">
+                        <ic:SymbolIcon Symbol="List" FontSize="16" />
+                    </Button>
+                    <Button Width="40"
+                            Height="32"
+                            ToolTip.Tip="Mute/Unmute">
+                        <ic:SymbolIcon Symbol="{Binding VolumeIcon}" FontSize="16" />
+                    </Button>
+                </StackPanel>
 
-                <!-- Volume Text -->
-                <TextBlock Grid.Column="2"
-                           FontSize="12"
-                           Width="28"
-                           Opacity="0.7"
-                           VerticalAlignment="Center"
-                           Text="{Binding CurrentVolume, StringFormat='{}{0}%'}" />
+                <!-- Volume Control -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="4">
+
+                    <Slider Width="80"
+                            Minimum="0"
+                            Maximum="100"
+                            Value="{Binding CurrentVolume}"
+                            VerticalAlignment="Center">
+                        <ToolTip.Tip>
+                            <TextBlock>
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="Volume: {0}%">
+                                        <Binding Path="CurrentVolume" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </ToolTip.Tip>
+                    </Slider>
+
+                    <TextBlock FontSize="11"
+                               MinWidth="28"
+                               Opacity="0.7"
+                               VerticalAlignment="Center"
+                               Text="{Binding CurrentVolume, StringFormat='{}{0}%'}" />
+                </StackPanel>
             </Grid>
         </Grid>
     </Border>

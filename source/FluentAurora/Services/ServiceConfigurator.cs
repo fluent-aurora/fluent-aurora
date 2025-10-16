@@ -22,6 +22,10 @@ public static class ServiceConfigurator
         services.AddTransient<ExpandedPlayer>();
         services.AddSingleton<ExpandedPlayerViewModel>();
         
+        // Views
+        services.AddSingleton<LibraryView>();
+        services.AddSingleton<LibraryViewModel>();
+        
         // Windows
         services.AddSingleton<MainWindow>();
         services.AddSingleton<MainWindowViewModel>();

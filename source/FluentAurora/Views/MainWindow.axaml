@@ -10,7 +10,7 @@
         x:Class="FluentAurora.Views.MainWindow"
         Icon="/Assets/icon.ico"
         Title="Fluent Aurora"
-        MinHeight="980"
+        MinHeight="{Binding MinWindowHeight}"
         MinWidth="810"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="48">

@@ -149,7 +149,7 @@ public class AudioPlayerService : IDisposable
             Logger.Info("Audio file loaded successfully");
 
             // Extract metadata from the file
-            CurrentMetadata = await Task.Run(() => ExtractMetadata(path));
+            CurrentMetadata = await Task.Run(() => AudioMetadata.Extract(path));
             MetadataLoaded?.Invoke(CurrentMetadata);
 
             // Duration notification (To update UI)
@@ -167,49 +167,6 @@ public class AudioPlayerService : IDisposable
             Logger.Error($"Failed to load media file '{path}': {ex}");
             IsMediaReady = false;
         }
-    }
-
-    private AudioMetadata ExtractMetadata(string filePath)
-    {
-        AudioMetadata metadata = new AudioMetadata
-        {
-            FilePath = filePath,
-            Duration = _audioFileReader?.TotalTime.TotalMilliseconds ?? 0
-        };
-
-        try
-        {
-            using TagLib.File? tagLibFile = TagLib.File.Create(filePath);
-
-            metadata.Title = tagLibFile.Tag.Title ?? Path.GetFileNameWithoutExtension(filePath);
-            metadata.Artist = tagLibFile.Tag.FirstPerformer ?? string.Empty;
-            metadata.Album = tagLibFile.Tag.Album ?? string.Empty;
-            metadata.AlbumArtist = tagLibFile.Tag.FirstAlbumArtist ?? string.Empty;
-            metadata.Genre = tagLibFile.Tag.FirstGenre ?? string.Empty;
-
-            // Extract album artwork
-            if (tagLibFile.Tag.Pictures?.Length > 0)
-            {
-                IPicture? image = tagLibFile.Tag.Pictures[0];
-                byte[]? imageData = image?.Data.Data;
-                if (imageData is { Length: > 0 })
-                {
-                    metadata.ArtworkData = imageData;
-                    Logger.Debug($"Album artwork extracted ({imageData.Length} bytes, Type: {image?.Type})");
-                }
-            }
-            else
-            {
-                Logger.Debug("No embedded artwork found");
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Error extracting metadata: {ex}");
-            metadata.Title = Path.GetFileNameWithoutExtension(filePath);
-        }
-
-        return metadata;
     }
 
     public void Play()

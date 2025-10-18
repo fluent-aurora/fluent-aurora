@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
-using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -19,6 +17,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
     // Properties
     private readonly AudioPlayerService _audioPlayerService;
     private readonly PlaybackControlService _playbackControlService;
+    private readonly StoragePickerService _storagePickerService;
     private bool _isUserSeeking = false;
     private bool _isDragging = false;
     private int _seekPosition;
@@ -57,9 +56,10 @@ public partial class CompactPlayerViewModel : ViewModelBase
     };
 
     // Constructor
-    public CompactPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService)
+    public CompactPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService, StoragePickerService storagePickerService)
     {
         _playbackControlService = playbackControlService;
+        _storagePickerService =  storagePickerService;
         _audioPlayerService = audioPlayerService;
         _audioPlayerService.Volume = CurrentVolume;
 
@@ -220,7 +220,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
     {
         // Cancel previous suppression
         _seekSuppressionCts?.Cancel();
-        _seekSuppressionCts = new System.Threading.CancellationTokenSource();
+        _seekSuppressionCts = new CancellationTokenSource();
 
         // Enable suppression
         _suppressPositionUpdate = true;
@@ -286,24 +286,9 @@ public partial class CompactPlayerViewModel : ViewModelBase
     [RelayCommand]
     private async Task OpenFile()
     {
-        if (App.MainWindow?.StorageProvider is not { } storageProvider)
+        string? filePath = await _storagePickerService.PickAudioFileAsync();
+        if (!string.IsNullOrEmpty(filePath))
         {
-            return;
-        }
-
-        IReadOnlyList<IStorageFile> result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Open Audio File",
-            AllowMultiple = false,
-            FileTypeFilter = new List<FilePickerFileType>
-            {
-                new FilePickerFileType("Audio Files") { Patterns = ["*.mp3", "*.wav", "*.flac", "*.ogg"] }
-            }
-        });
-
-        if (result.Count > 0)
-        {
-            string? filePath = result[0].Path.LocalPath;
             await _audioPlayerService.PlayFileAsync(filePath);
         }
     }

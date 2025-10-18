@@ -12,27 +12,28 @@ public static class ServiceConfigurator
     public static IServiceProvider ConfigureServices()
     {
         ServiceCollection services = new ServiceCollection();
-        
+
         // Core
         services.AddSingleton<AudioPlayerService>(); // Audio Player
-        
+
         // Controls
         services.AddTransient<CompactPlayer>();
         services.AddSingleton<CompactPlayerViewModel>();
         services.AddTransient<ExpandedPlayer>();
         services.AddSingleton<ExpandedPlayerViewModel>();
-        
+
         // Views
         services.AddSingleton<LibraryView>();
         services.AddSingleton<LibraryViewModel>();
-        
+
         // Windows
         services.AddSingleton<MainWindow>();
         services.AddSingleton<MainWindowViewModel>();
-        
+
         // Services
         services.AddSingleton<PlaybackControlService>();
-        
+        services.AddSingleton<StoragePickerService>();
+
         return services.BuildServiceProvider();
     }
 }

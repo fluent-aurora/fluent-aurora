@@ -5,7 +5,7 @@ namespace FluentAurora.ViewModels;
 
 public class ExpandedPlayerViewModel : CompactPlayerViewModel
 {
-    public ExpandedPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService) : base(audioPlayerService, playbackControlService)
+    public ExpandedPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService, StoragePickerService storagePickerService) : base(audioPlayerService, playbackControlService, storagePickerService)
     {
     }
 }

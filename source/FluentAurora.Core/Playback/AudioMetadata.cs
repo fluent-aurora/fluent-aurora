@@ -22,6 +22,8 @@ public class AudioMetadata
     // Methods
     public string DisplayTitle => !string.IsNullOrWhiteSpace(Title) ? Path.GetFileNameWithoutExtension(Title) : "Unknown Title";
 
+    public static string[] GetSupportedExtensions() => [".mp3", ".ogg", ".wav", ".flac"];
+
     public static AudioMetadata Extract(string filePath)
     {
         AudioMetadata metadata = new AudioMetadata
@@ -66,7 +68,7 @@ public class AudioMetadata
             Logger.Error($"Error extracting metadata: {ex}");
             metadata.Title = Path.GetFileNameWithoutExtension(filePath);
         }
-        
+
         return metadata;
     }
 }

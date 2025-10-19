@@ -139,7 +139,7 @@
                                                         Background="{StaticResource SongCardBackground}"
                                                         Classes="song-item"
                                                         Cursor="Hand"
-                                                        DoubleTapped="InputElement_OnDoubleTapped"
+                                                        Tapped="SongElement_OnTapped"
                                                         BoxShadow="0 1 3 #22000000"
                                                         IsHitTestVisible="True">
                                                     <Border.ContextFlyout>
@@ -147,6 +147,9 @@
                                                             <StackPanel>
                                                                 <Button Content="Play"
                                                                         Command="{Binding DataContext.PlaySongCommand, ElementName=LibraryRoot}"
+                                                                        CommandParameter="{Binding}" />
+                                                                <Button Content="Add to Queue"
+                                                                        Command="{Binding DataContext.EnqueueSongCommand, ElementName=LibraryRoot}"
                                                                         CommandParameter="{Binding}" />
                                                             </StackPanel>
                                                         </Flyout>

@@ -80,7 +80,8 @@
                         <!-- Previous -->
                         <Button Width="40"
                                 Height="32"
-                                ToolTip.Tip="Previous Track">
+                                ToolTip.Tip="Previous Track"
+                                Command="{Binding PreviousTrackCommand}">
                             <ic:SymbolIcon Symbol="Previous" FontSize="16" />
                         </Button>
 
@@ -95,7 +96,8 @@
                         <!-- Next -->
                         <Button Width="40"
                                 Height="32"
-                                ToolTip.Tip="Next Track">
+                                ToolTip.Tip="Next Track"
+                                Command="{Binding NextTrackCommand}">
                             <ic:SymbolIcon Symbol="Next" FontSize="16" />
                         </Button>
 

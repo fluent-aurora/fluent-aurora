@@ -14,7 +14,7 @@ public partial class LibraryView : UserControl
         DataContext = App.Services?.GetRequiredService<LibraryViewModel>();
     }
 
-    private void InputElement_OnDoubleTapped(object? sender, TappedEventArgs e)
+    private void SongElement_OnTapped(object? sender, TappedEventArgs e)
     {
         if (sender is not Border { DataContext: AudioMetadata song })
         {

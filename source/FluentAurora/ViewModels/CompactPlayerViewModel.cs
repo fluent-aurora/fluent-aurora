@@ -59,7 +59,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
     public CompactPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService, StoragePickerService storagePickerService)
     {
         _playbackControlService = playbackControlService;
-        _storagePickerService =  storagePickerService;
+        _storagePickerService = storagePickerService;
         _audioPlayerService = audioPlayerService;
         _audioPlayerService.Volume = CurrentVolume;
 
@@ -130,6 +130,16 @@ public partial class CompactPlayerViewModel : ViewModelBase
                 OnPropertyChanged(nameof(SongArtwork));
             });
         };
+
+        RepeatMode = _audioPlayerService.Repeat;
+        _audioPlayerService.RepeatChanged += repeat =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                RepeatMode = repeat;
+                OnPropertyChanged(nameof(RepeatIcon));
+            });
+        };
     }
 
     // Methods
@@ -138,19 +148,23 @@ public partial class CompactPlayerViewModel : ViewModelBase
         OnPropertyChanged(nameof(PlayPauseIcon));
     }
 
+    [RelayCommand]
+    private void NextTrack()
+    {
+        _audioPlayerService.PlayNext();
+    }
+
+    [RelayCommand]
+    private void PreviousTrack()
+    {
+        _audioPlayerService.PlayPrevious();
+    }
+
+
     partial void OnRepeatModeChanged(RepeatMode value)
     {
         OnPropertyChanged(nameof(RepeatIcon));
-        UpdateRepeatMode();
-    }
-
-    private void UpdateRepeatMode()
-    {
-        _audioPlayerService.IsLooping = RepeatMode switch
-        {
-            RepeatMode.Off => false,
-            _ => true
-        };
+        _audioPlayerService.Repeat = value;
     }
 
     partial void OnCurrentVolumeChanged(int value)
@@ -268,7 +282,8 @@ public partial class CompactPlayerViewModel : ViewModelBase
         }
         else
         {
-            Logger.Warning("There's no file playing");
+            Logger.Info("Nothing is currently playing");
+            _audioPlayerService.PlayQueue();
         }
     }
 

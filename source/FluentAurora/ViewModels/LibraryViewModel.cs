@@ -121,8 +121,30 @@ public partial class LibraryViewModel : ViewModelBase
             Logger.Warning("No song selected or file path is empty");
             return;
         }
-        
+
+        _audioPlayerService.ClearQueue();
         await _audioPlayerService.PlayFileAsync(song.FilePath); 
     }
 
+    [RelayCommand]
+    public void EnqueueSong(AudioMetadata song)
+    {
+        _audioPlayerService.Enqueue(song);
+    }
+
+    [RelayCommand]
+    public void PlayPlaylist(FolderPlaylistViewModel playlist)
+    {
+        if (playlist == null || playlist.Songs.Count == 0)
+        {
+            Logger.Warning("Playlist is empty or null");
+            return;
+        }
+
+        Logger.Info($"Queueing playlist: {playlist.Name}");
+
+        _audioPlayerService.ClearQueue();
+        _audioPlayerService.Enqueue(playlist.Songs);
+        _audioPlayerService.PlayQueue();
+    }
 }

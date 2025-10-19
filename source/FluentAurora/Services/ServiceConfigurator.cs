@@ -1,5 +1,6 @@
 ﻿using System;
 using FluentAurora.Controls;
+using FluentAurora.Core.Indexer;
 using FluentAurora.Core.Playback;
 using FluentAurora.ViewModels;
 using FluentAurora.Views;
@@ -31,6 +32,7 @@ public static class ServiceConfigurator
         services.AddSingleton<MainWindowViewModel>();
 
         // Services
+        services.AddSingleton<DatabaseManager>();
         services.AddSingleton<PlaybackControlService>();
         services.AddSingleton<StoragePickerService>();
 

@@ -1,7 +1,6 @@
 ﻿using FluentAurora.Core.Logging;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
-using TagLib;
 
 namespace FluentAurora.Core.Playback;
 

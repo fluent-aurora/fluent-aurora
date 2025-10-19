@@ -66,6 +66,7 @@
             <!-- NavigationView -->
             <ui:NavigationView AlwaysShowHeader="False"
                                OpenPaneLength="150"
+                               Margin="0,0,0,90"
                                ItemInvoked="NavigationView_OnItemInvoked">
                 <!-- Navigation Menu Items -->
                 <ui:NavigationView.MenuItems>

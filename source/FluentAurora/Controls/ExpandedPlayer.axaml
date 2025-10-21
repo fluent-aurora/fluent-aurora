@@ -236,7 +236,7 @@
                                 <ToolTip.Tip>
                                     <TextBlock>
                                         <TextBlock.Text>
-                                            <MultiBinding StringFormat="Volume: {0}%">
+                                            <MultiBinding StringFormat="Volume: {0:F0}%">
                                                 <Binding Path="CurrentVolume" />
                                             </MultiBinding>
                                         </TextBlock.Text>
@@ -244,7 +244,7 @@
                                 </ToolTip.Tip>
                             </Slider>
 
-                            <TextBlock Text="{Binding CurrentVolume, StringFormat='{}{0}%'}"
+                            <TextBlock Text="{Binding CurrentVolume, StringFormat='{}{0:F0}%'}"
                                        FontSize="12"
                                        MinWidth="35"
                                        Opacity="0.7"

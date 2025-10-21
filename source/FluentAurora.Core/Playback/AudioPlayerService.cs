@@ -1,342 +1,163 @@
-﻿using FluentAurora.Core.Logging;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
+﻿using FluentAurora.Core.Indexer;
+using FluentAurora.Core.Logging;
+using CSCore;
+using CSCore.Codecs;
+using CSCore.SoundOut;
+using CSCore.Streams;
 
 namespace FluentAurora.Core.Playback;
 
-public class AudioPlayerService : IDisposable
+public sealed class AudioPlayerService : IDisposable
 {
-    // Properties
-    private IWavePlayer? _wavePlayer;
-    private AudioFileReader? _audioFileReader;
-    private VolumeSampleProvider? _volumeProvider;
-    private string? _currentFilePath;
-    private Timer? _positionTimer;
-    private bool _isDisposed;
-    private readonly List<AudioMetadata> Queue = [];
-    private int _currentSongIndex = -1; // -1 = Nothing is playing
+    // Constants
+    private const int POSITION_UPDATE_INTERVAL_MS = 100;
+    private const int DESIRED_LATENCY_MS = 100;
+    private const float VOLUME_SOFT_CURVE_THRESHOLD = 0.5f;
+    private const float VOLUME_SOFT_CURVE_FACTOR = 0.6f;
+    private const float VOLUME_FAST_CURVE_BASE = 0.3f;
+    private const float VOLUME_FAST_CURVE_FACTOR = 1.4f;
 
-    public AudioMetadata? CurrentSong => _currentSongIndex >= 0 && _currentSongIndex < Queue.Count ? Queue[_currentSongIndex] : null;
+    // Queue storage
+    private readonly List<AudioMetadata> _queue = new List<AudioMetadata>();
+    private readonly HashSet<string> _queuePaths = new HashSet<string>();
+
+    // Playback pipeline
+    private ISoundOut? _soundOut;
+    private IWaveSource? _waveSource;
+    private VolumeSource? _volumeSource;
+
+    // Timer for position updates
+    private Timer? _positionTimer;
+
+    // State
+    private int _currentSongIndex = -1;
+    private float _volume = 100f; // 0-100
+    private RepeatMode _repeat = RepeatMode.All;
+    private bool _isIntentionalStop;
+    private bool _isDisposed;
+
+    // Public properties
+    public AudioMetadata? CurrentSong => _currentSongIndex >= 0 && _currentSongIndex < _queue.Count ? _queue[_currentSongIndex] : null;
+
     public bool IsPlaying { get; private set; }
     public bool IsMediaReady { get; private set; }
-    private RepeatMode _repeat = RepeatMode.All;
+
+    public IReadOnlyList<AudioMetadata> Queue => _queue.AsReadOnly();
+    public int CurrentIndex => _currentSongIndex;
 
     public RepeatMode Repeat
     {
         get => _repeat;
         set
         {
-            if (_repeat != value)
+            if (_repeat == value)
             {
-                _repeat = value;
-                RepeatChanged?.Invoke(_repeat);
+                return;
             }
+            _repeat = value;
+            RepeatModeChanged?.Invoke(_repeat);
         }
     }
 
-    private int _volume = 100;
-
-    public int Volume
+    public float Volume
     {
         get => _volume;
-        set
-        {
-            // Volume Curve
-            _volume = Math.Clamp(value, 0, 100);
-            float normalized = _volume / 100f;
-            float adjusted = _volume switch
-            {
-                <= 50 => normalized * 0.6f, // Softer curve below 50% volume
-                _ => 0.3f + (normalized - 0.5f) * 1.4f // Faster curve after 50% volume than linear curve
-            };
-
-            if (_volumeProvider != null)
-            {
-                _volumeProvider.Volume = adjusted;
-            }
-
-            Logger.Info($"Setting volume to {_volume}% (Internal: {(adjusted * 100)}%)");
-
-            VolumeChanged?.Invoke(_volume);
-        }
+        set => SetVolume(value);
     }
-
-    private bool _internalStop = false;
 
     // Events
     public event Action? PlaybackStarted;
     public event Action? PlaybackPaused;
     public event Action? PlaybackStopped;
-    public event Action<int>? PositionChanged;
-    public event Action<int>? DurationChanged;
-    public event Action<int>? VolumeChanged;
+    public event Action<double>? PositionChanged;
+    public event Action<double>? DurationChanged;
+    public event Action<float>? VolumeChanged;
     public event Action? MediaReady;
     public event Action? MediaEnded;
     public event Action<AudioMetadata>? MetadataLoaded;
-    public event Action<RepeatMode>? RepeatChanged;
+    public event Action<RepeatMode>? RepeatModeChanged;
 
     // Constructor
     public AudioPlayerService()
     {
-        Logger.Info("Initializing AudioPlayerService (NAudio)");
-        InitializeWavePlayer();
+        Logger.Info("Initializing AudioPlayerService (CSCore)");
+        InitializeSoundOut();
         Logger.Info("AudioPlayerService initialized successfully");
     }
 
-    private void InitializeWavePlayer()
-    {
-        try
-        {
-            _wavePlayer = new WaveOutEvent
-            {
-                DesiredLatency = 100
-            };
-
-            _wavePlayer.PlaybackStopped += OnPlaybackStopped;
-            Logger.Debug("WavePlayer initialized");
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Failed to initialize WavePlayer: {ex}");
-            throw;
-        }
-    }
-
-    private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
-    {
-        if (e.Exception != null)
-        {
-            Logger.Error($"Playback stopped with error: {e.Exception}");
-            return;
-        }
-
-        Logger.Info("Playback stopped");
-        IsPlaying = false;
-        PlaybackStopped?.Invoke();
-
-        if (_internalStop)
-        {
-            // Internal stop, do NOT auto-play next
-            _internalStop = false;
-            return;
-        }
-
-        // Check if the end of the file has been reached
-        if (_audioFileReader != null && _audioFileReader.Position >= _audioFileReader.Length - _audioFileReader.WaveFormat.AverageBytesPerSecond / 10) // Within 100ms of end
-        {
-            Logger.Info("Media playback ended");
-            MediaEnded?.Invoke();
-
-            switch (Repeat)
-            {
-                case RepeatMode.All:
-                    Logger.Debug("Repeat Mode is set to Repeat All");
-                    if (_currentSongIndex < Queue.Count - 1)
-                    {
-                        Logger.Debug("Playing next song in the queue");
-                        PlayNext();
-                    }
-                    else
-                    {
-                        Logger.Debug("Restarting queue from beginning");
-                        _currentSongIndex = 0;
-                        PlayQueue(_currentSongIndex);
-                    }
-                    break;
-                case RepeatMode.One:
-                    Logger.Debug("Repeat Mode is set to Repeat One");
-                    Play();
-                    break;
-                case RepeatMode.Off:
-                    break;
-            }
-        }
-    }
-
     // Methods
+    // Public: Queue management
     public void Enqueue(AudioMetadata song)
     {
-        if (Queue.Any(s => string.Equals(s.FilePath, song.FilePath, StringComparison.OrdinalIgnoreCase)))
+        ArgumentNullException.ThrowIfNull(song);
+
+        if (string.IsNullOrEmpty(song.FilePath))
+        {
+            Logger.Warning("Song has no file path, cannot enqueue");
+            return;
+        }
+
+        if (!_queuePaths.Add(song.FilePath))
         {
             Logger.Info($"Song already in queue, skipping: {song.Title}");
             return;
         }
-        Queue.Add(song);
+
+        _queue.Add(song);
         Logger.Info($"Enqueued song: {song.Title}");
     }
 
     public void Enqueue(IEnumerable<AudioMetadata> songs)
     {
-        Queue.AddRange(songs);
-        Logger.Info($"Enqueued songs: {string.Join(", ", songs.Select(s => s.Title))}");
+        List<AudioMetadata> newSongs = songs.Where(s => !string.IsNullOrEmpty(s.FilePath) && _queuePaths.Add(s.FilePath)).ToList();
+        if (newSongs.Count == 0)
+        {
+            return;
+        }
+
+        _queue.AddRange(newSongs);
+        Logger.Info($"Enqueued {newSongs.Count} songs");
     }
 
     public void ClearQueue()
     {
-        Queue.Clear();
+        _queue.Clear();
+        _queuePaths.Clear();
         _currentSongIndex = -1;
         Stop();
         Logger.Info("Queue cleared");
     }
 
-    public void PlayNext()
-    {
-        if (Queue.Count == 0)
-        {
-            Logger.Error("No more songs to play");
-            return;
-        }
-
-        if (Queue.Count == 1 || Repeat == RepeatMode.One)
-        {
-            Logger.Info($"Restarting current song");
-            _audioFileReader?.Seek(0, SeekOrigin.Begin);
-            Play();
-            return;
-        }
-
-
-        _currentSongIndex++;
-        if (_currentSongIndex >= Queue.Count)
-        {
-            if (Repeat == RepeatMode.All)
-            {
-                _currentSongIndex = 0;
-                PlayQueue(_currentSongIndex);
-            }
-            else
-            {
-                Logger.Error("Reached the end of the queue");
-                _currentSongIndex = Queue.Count - 1;
-            }
-            return;
-        }
-
-        AudioMetadata nextSong = Queue[_currentSongIndex];
-        Logger.Info($"Playing next song: {nextSong.Title}");
-        _ = PlayFileAsync(nextSong.FilePath!);
-    }
-
-    public void PlayPrevious()
-    {
-        if (Queue.Count == 0)
-        {
-            return;
-        }
-
-        if (Queue.Count == 1 || Repeat == RepeatMode.One)
-        {
-            Logger.Info("Restarting current song");
-            _audioFileReader?.Seek(0, SeekOrigin.Begin);
-            return;
-        }
-
-        _currentSongIndex--;
-        if (_currentSongIndex < 0)
-        {
-            if (Repeat == RepeatMode.All)
-            {
-                _currentSongIndex = Queue.Count - 1;
-                PlayQueue(_currentSongIndex);
-            }
-            else
-            {
-                Logger.Info("Already at the first song");
-                _currentSongIndex = 0;
-            }
-            return;
-        }
-
-        AudioMetadata prevSong = Queue[_currentSongIndex];
-        Logger.Info($"Playing previous song: {prevSong.Title}");
-        _ = PlayFileAsync(prevSong.FilePath!);
-    }
-
+    // Public: Playback controls
     public void PlayQueue(int startIndex = 0)
     {
-        Logger.Info("Playing queue");
-        if (Queue.Count == 0)
+        if (_queue.Count == 0)
         {
-            Logger.Error("There are no songs in the queue");
+            Logger.Error("Queue is empty");
             return;
         }
 
-        Repeat = Queue.Count switch
-        {
-            1 => RepeatMode.One,
-            _ => RepeatMode.All
-        };
+        Repeat = _queue.Count == 1 ? RepeatMode.One : RepeatMode.All;
+        _currentSongIndex = Math.Clamp(startIndex, 0, _queue.Count - 1);
 
-        _currentSongIndex = Math.Clamp(startIndex, 0, Queue.Count - 1);
-        AudioMetadata song = Queue[_currentSongIndex];
+        AudioMetadata song = _queue[_currentSongIndex];
         Logger.Info($"Starting queue at: {song.Title}");
         _ = PlayFileAsync(song.FilePath!);
     }
 
     public async Task PlayFileAsync(string path)
     {
-        if (string.IsNullOrEmpty(path) || (!File.Exists(path) && !Uri.IsWellFormedUriString(path, UriKind.Absolute)))
+        if (!IsValidPath(path))
         {
-            Logger.Warning($"Media file not found or invalid URL: {path}");
+            Logger.Warning($"Invalid media path: {path}");
             return;
         }
 
-        // Check if the song is already in the queue
-        int indexInQueue = Queue.FindIndex(s => s.FilePath == path);
-
-        if (indexInQueue == -1)
-        {
-            // If not in the queue, enqueue it
-            AudioMetadata metadata = await Task.Run(() => AudioMetadata.Extract(path));
-            Queue.Add(metadata);
-            _currentSongIndex = Queue.Count - 1; // Set current index to the newly added song
-            Logger.Info($"Added and playing new song in queue: {metadata.Title}");
-        }
-        else
-        {
-            // Song already in queue, just update the index
-            _currentSongIndex = indexInQueue;
-            Logger.Info($"Playing existing song in queue: {Queue[_currentSongIndex].Title}");
-        }
-
-        _internalStop = true;
-        _wavePlayer?.Stop();
-        await Task.Delay(50);
-        DisposeCurrentMedia();
-        IsMediaReady = false;
+        await PrepareForNewFile(path).ConfigureAwait(false);
 
         try
         {
-            _currentFilePath = path;
-            _audioFileReader = new AudioFileReader(path);
-
-            // Create volume provider
-            _volumeProvider = new VolumeSampleProvider(_audioFileReader)
-            {
-                Volume = _volume / 100f
-            };
-            Volume = _volume; // Re-apply volume curve
-
-            _wavePlayer?.Init(_volumeProvider);
-
-            Logger.Info("Audio file loaded successfully");
-
-            if (CurrentSong == null)
-            {
-                Logger.Error("Song metadata is missing");
-                return;
-            }
-
-            MetadataLoaded?.Invoke(CurrentSong);
-
-            // Duration notification
-            int durationMs = (int)(_audioFileReader.TotalTime.TotalMilliseconds);
-            DurationChanged?.Invoke(durationMs);
-
-            IsMediaReady = true;
-            MediaReady?.Invoke();
-            Logger.Info("Media is ready (Invoking MediaReady event)");
-
+            LoadAudioFile(path);
             Play();
         }
         catch (Exception ex)
@@ -346,44 +167,35 @@ public class AudioPlayerService : IDisposable
         }
     }
 
-
     public void Play()
     {
-        if (!IsMediaReady || _wavePlayer == null || _audioFileReader == null)
+        if (!CanPlay())
         {
-            Logger.Warning("Play() called but media is not ready");
+            Logger.Warning("Cannot play - media not ready");
             return;
         }
 
         Logger.Info("Starting playback");
+        ResetPositionIfAtEnd();
 
-        // If at the end, restart from beginning
-        if (_audioFileReader.Position >= _audioFileReader.Length)
-        {
-            _audioFileReader.Position = 0;
-        }
-
-        _wavePlayer.Play();
+        _soundOut!.Play();
         IsPlaying = true;
         PlaybackStarted?.Invoke();
-
-        // Start position update timer
         StartPositionTimer();
     }
 
     public void Pause()
     {
-        if (_wavePlayer?.PlaybackState != PlaybackState.Playing)
+        if (_soundOut?.PlaybackState != PlaybackState.Playing)
         {
-            Logger.Warning("Pause() called but not playing");
+            Logger.Warning("Cannot pause - not currently playing");
             return;
         }
 
         Logger.Info("Pausing playback");
-        _wavePlayer?.Pause();
+        _soundOut.Pause();
         IsPlaying = false;
         PlaybackPaused?.Invoke();
-
         StopPositionTimer();
     }
 
@@ -394,75 +206,343 @@ public class AudioPlayerService : IDisposable
             return;
         }
 
-        _internalStop = true; // Mark this stop as intentional
+        _isIntentionalStop = true;
         Logger.Info("Stopping playback");
-
         StopPositionTimer();
-        _wavePlayer?.Stop();
-
-        if (_audioFileReader != null)
-        {
-            _audioFileReader.Position = 0;
-        }
-
+        _soundOut?.Stop();
+        ResetPosition();
         IsPlaying = false;
         Logger.Debug("Playback stopped and position reset");
     }
 
-    public void SeekTo(int positionMs)
+    public void PlayNext()
     {
-        if (!IsMediaReady || _audioFileReader == null)
+        if (!CanNavigate())
         {
-            Logger.Warning("SeekTo() called but media is not ready");
+            return;
+        }
+
+        if (ShouldRestartCurrent())
+        {
+            RestartCurrent();
+            return;
+        }
+
+        NavigateToIndex(GetNextIndex());
+    }
+
+    public void PlayPrevious()
+    {
+        if (!CanNavigate())
+        {
+            return;
+        }
+
+        if (ShouldRestartCurrent())
+        {
+            RestartCurrent();
+            return;
+        }
+
+        NavigateToIndex(GetPreviousIndex());
+    }
+
+    public void SeekTo(double positionMs)
+    {
+        if (!IsMediaReady || _waveSource == null)
+        {
+            Logger.Warning("Cannot seek - media not ready");
             return;
         }
 
         Logger.Info($"Seeking to position: {positionMs}ms");
 
-        TimeSpan targetPosition = TimeSpan.FromMilliseconds(positionMs);
-        if (targetPosition > _audioFileReader.TotalTime)
-        {
-            targetPosition = _audioFileReader.TotalTime;
-        }
-        else if (targetPosition < TimeSpan.Zero)
-        {
-            targetPosition = TimeSpan.Zero;
-        }
-
-        // Stop position timer to avoid conflicts
+        TimeSpan target = ClampPosition(TimeSpan.FromMilliseconds(positionMs));
         bool wasPlaying = IsPlaying;
+
         StopPositionTimer();
+        _waveSource.SetPosition(target);
+        PositionChanged?.Invoke(target.TotalMilliseconds);
 
-        _audioFileReader.CurrentTime = targetPosition;
-        PositionChanged?.Invoke(positionMs);
-
-        // Resume position timer if the song is playing
         if (wasPlaying)
         {
             StartPositionTimer();
         }
     }
 
-    public int GetCurrentPosition()
+    public double GetCurrentPosition() => _waveSource?.GetPosition().TotalMilliseconds ?? 0;
+
+    public double GetDuration() => _waveSource?.GetLength().TotalMilliseconds ?? 0;
+
+    // Private: Initialization
+    private void InitializeSoundOut()
     {
-        return (int)(_audioFileReader?.CurrentTime.TotalMilliseconds ?? 0);
+        try
+        {
+            _soundOut = new WasapiOut() { Latency = DESIRED_LATENCY_MS };
+            _soundOut.Stopped += OnPlaybackStopped;
+            Logger.Debug("SoundOut initialized");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to initialize SoundOut: {ex}");
+            throw;
+        }
     }
 
-    public int GetDuration()
+    // Private: Volume Control
+    private void SetVolume(float value)
     {
-        return (int)(_audioFileReader?.TotalTime.TotalMilliseconds ?? 0);
+        _volume = Math.Clamp(value, 0.0f, 100.0f);
+        float adjustedVolume = CalculateAdjustedVolume(_volume);
+
+        if (_volumeSource != null)
+        {
+            _volumeSource.Volume = adjustedVolume;
+        }
+
+        Logger.Info($"Volume set to {_volume}% (Adjusted: {adjustedVolume * 100}%)");
+        VolumeChanged?.Invoke(_volume);
     }
 
+    private static float CalculateAdjustedVolume(float volume)
+    {
+        float normalized = volume / 100.0f;
+        return volume <= 50.0f ? normalized * VOLUME_SOFT_CURVE_FACTOR : VOLUME_FAST_CURVE_BASE + (normalized - VOLUME_SOFT_CURVE_THRESHOLD) * VOLUME_FAST_CURVE_FACTOR;
+    }
+
+    // Private: Validation and small helper
+    private bool IsValidPath(string path) => !string.IsNullOrEmpty(path) && (File.Exists(path) || Uri.IsWellFormedUriString(path, UriKind.Absolute));
+
+    private bool CanPlay() => IsMediaReady && _soundOut != null && _waveSource != null;
+
+    private bool CanNavigate() => _queue.Count > 0;
+
+    private bool ShouldRestartCurrent() => _queue.Count == 1 || Repeat == RepeatMode.One;
+
+    private void RestartCurrent()
+    {
+        Logger.Info("Restarting current song");
+        _waveSource?.SetPosition(TimeSpan.Zero);
+        Play();
+    }
+
+    private void ResetPositionIfAtEnd()
+    {
+        if (_waveSource != null && _waveSource.Position >= _waveSource.Length)
+        {
+            _waveSource.Position = 0;
+        }
+    }
+
+    private void ResetPosition()
+    {
+        if (_waveSource != null)
+        {
+            _waveSource.Position = 0;
+        }
+    }
+
+    private TimeSpan ClampPosition(TimeSpan position)
+    {
+        if (_waveSource == null)
+        {
+            return TimeSpan.Zero;
+        }
+
+        TimeSpan total = _waveSource.GetLength();
+        if (position > total)
+        {
+            return total;
+        }
+        if (position < TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+        return position;
+    }
+
+    private int GetNextIndex()
+    {
+        int next = _currentSongIndex + 1;
+        if (next >= _queue.Count)
+        {
+            return Repeat == RepeatMode.All ? 0 : _currentSongIndex;
+        }
+        return next;
+    }
+
+    private int GetPreviousIndex()
+    {
+        int prev = _currentSongIndex - 1;
+        if (prev < 0)
+        {
+            return Repeat == RepeatMode.All ? _queue.Count - 1 : 0;
+        }
+        return prev;
+    }
+
+    private void NavigateToIndex(int index)
+    {
+        if (index == _currentSongIndex)
+        {
+            return;
+        }
+
+        _currentSongIndex = index;
+        AudioMetadata song = _queue[_currentSongIndex];
+        Logger.Info($"Playing song: {song.Title}");
+        _ = PlayFileAsync(song.FilePath!);
+    }
+
+    // Private: Song Loading/Preparation
+    private async Task PrepareForNewFile(string path)
+    {
+        int indexInQueue = _queue.FindIndex(s => s.FilePath == path);
+
+        if (indexInQueue == -1)
+        {
+            AudioMetadata? metadata = await Task.Run(() => DatabaseManager.GetSongByFilePath(path)).ConfigureAwait(false);
+            if (metadata == null)
+            {
+                Logger.Error("Failed to find specific song in DB, adding it to the index");
+                DatabaseManager.AddSong(path);
+                metadata = await Task.Run(() => DatabaseManager.GetSongByFilePath(path)).ConfigureAwait(false);
+            }
+            
+            // If there was an error while adding the song to the database, create a temporary metadata
+            metadata ??= new AudioMetadata { FilePath = path, Title = Path.GetFileNameWithoutExtension(path) };
+
+            _queue.Add(metadata);
+            if (!string.IsNullOrEmpty(metadata.FilePath)) _queuePaths.Add(metadata.FilePath);
+            _currentSongIndex = _queue.Count - 1;
+            Logger.Info($"Added new song to queue: {metadata.Title}");
+        }
+        else
+        {
+            _currentSongIndex = indexInQueue;
+            Logger.Info($"Playing existing song: {_queue[_currentSongIndex].Title}");
+        }
+
+        _isIntentionalStop = true;
+        _soundOut?.Stop();
+        await Task.Delay(50).ConfigureAwait(false);
+        _isIntentionalStop = false; // Reset the flag after stopping (in case RepeatMode is set to All/One and there's 1 track)
+        DisposeCurrentMedia();
+        IsMediaReady = false;
+    }
+
+    private void LoadAudioFile(string path)
+    {
+        _waveSource = CodecFactory.Instance.GetCodec(path);
+
+        _volumeSource = new VolumeSource(_waveSource.ToSampleSource());
+        SetVolume(_volume);
+
+        _soundOut?.Initialize(_volumeSource.ToWaveSource());
+        Logger.Info("Audio file loaded successfully");
+
+        if (CurrentSong == null)
+        {
+            Logger.Error("Song metadata is missing");
+            // Can play, but metadata events won't trigger
+        }
+        else
+        {
+            // Try to fill artwork from DB if missing
+            CurrentSong.ArtworkData ??= DatabaseManager.GetSongArtwork(CurrentSong.FilePath!);
+            MetadataLoaded?.Invoke(CurrentSong);
+        }
+
+        DurationChanged?.Invoke(GetDuration());
+        IsMediaReady = true;
+        MediaReady?.Invoke();
+        Logger.Info("Media ready");
+    }
+
+    // Playback stopped handler
+    private void OnPlaybackStopped(object? sender, PlaybackStoppedEventArgs e)
+    {
+        if (e.HasError)
+        {
+            Logger.Error($"Playback stopped with error: {e.Exception}");
+            return;
+        }
+
+        Logger.Info("Playback stopped");
+        IsPlaying = false;
+        PlaybackStopped?.Invoke();
+
+        if (_isIntentionalStop)
+        {
+            _isIntentionalStop = false;
+            return;
+        }
+
+        if (IsEndOfFile())
+        {
+            HandleMediaEnded();
+        }
+    }
+
+    private bool IsEndOfFile()
+    {
+        if (_waveSource == null)
+        {
+            return false;
+        }
+
+        // allow small tolerance
+        int toleranceBytes = _waveSource.WaveFormat.BytesPerSecond / 10;
+        return _waveSource.Position >= _waveSource.Length - toleranceBytes;
+    }
+
+    private void HandleMediaEnded()
+    {
+        Logger.Info("Media playback ended");
+        MediaEnded?.Invoke();
+
+        switch (Repeat)
+        {
+            case RepeatMode.All:
+                HandleRepeatAll();
+                break;
+            case RepeatMode.One:
+                RestartCurrent();
+                break;
+            case RepeatMode.Off:
+            default:
+                // nothing
+                break;
+        }
+    }
+
+    private void HandleRepeatAll()
+    {
+        if (_currentSongIndex < _queue.Count - 1)
+        {
+            PlayNext();
+        }
+        else
+        {
+            _currentSongIndex = 0;
+            PlayQueue();
+        }
+    }
+
+    // Position timer
     private void StartPositionTimer()
     {
         StopPositionTimer();
-        _positionTimer = new Timer(_ =>
+        _positionTimer = new Timer(_ => UpdatePosition(), null, 0, POSITION_UPDATE_INTERVAL_MS);
+    }
+
+    private void UpdatePosition()
+    {
+        if (IsPlaying && _waveSource != null)
         {
-            if (IsPlaying && _audioFileReader != null)
-            {
-                PositionChanged?.Invoke(GetCurrentPosition());
-            }
-        }, null, 0, 100); // Update every 100ms
+            PositionChanged?.Invoke(GetCurrentPosition());
+        }
     }
 
     private void StopPositionTimer()
@@ -471,13 +551,17 @@ public class AudioPlayerService : IDisposable
         _positionTimer = null;
     }
 
+    // Disposal of current media resources
     private void DisposeCurrentMedia()
     {
         try
         {
-            _audioFileReader?.Dispose();
-            _audioFileReader = null;
-            _volumeProvider = null;
+            _volumeSource?.Dispose();
+            _volumeSource = null;
+
+            _waveSource?.Dispose();
+            _waveSource = null;
+
             Logger.Debug("Current media disposed");
         }
         catch (Exception ex)
@@ -486,6 +570,7 @@ public class AudioPlayerService : IDisposable
         }
     }
 
+    // Dispose
     public void Dispose()
     {
         if (_isDisposed)
@@ -498,17 +583,17 @@ public class AudioPlayerService : IDisposable
         try
         {
             StopPositionTimer();
-            _wavePlayer?.Stop();
-            _wavePlayer?.Dispose();
-            Logger.Debug("WavePlayer disposed");
+            _soundOut?.Stop();
+            _soundOut?.Dispose();
+            _soundOut = null;
+            Logger.Debug("SoundOut disposed");
         }
         catch (Exception ex)
         {
-            Logger.Error($"Error disposing WavePlayer: {ex}");
+            Logger.Error($"Error disposing SoundOut: {ex}");
         }
 
         DisposeCurrentMedia();
-
         _isDisposed = true;
         Logger.Info("AudioPlayerService disposed");
     }

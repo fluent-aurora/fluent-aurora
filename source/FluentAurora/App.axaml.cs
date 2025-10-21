@@ -5,6 +5,7 @@ using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using FluentAurora.Core.Playback;
 using FluentAurora.Services;
 using FluentAurora.ViewModels;
 using FluentAurora.Views;
@@ -42,13 +43,18 @@ public partial class App : Application
             mainWindow.Closing += (_, _) =>
             {
                 Logger.Info("Closing FluentAurora");
+                if (Services.GetService<AudioPlayerService>() is { } audioPlayerService)
+                {
+                    audioPlayerService.Stop();
+                    audioPlayerService.Dispose();
+                }
                 LogManager.Flush();
             };
             desktop.Exit += (_, _) =>
             {
                 Logger.Shutdown();
             };
-            
+
             desktop.MainWindow = mainWindow;
         }
 

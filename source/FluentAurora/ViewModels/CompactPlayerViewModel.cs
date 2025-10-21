@@ -20,8 +20,8 @@ public partial class CompactPlayerViewModel : ViewModelBase
     private readonly StoragePickerService _storagePickerService;
     private bool _isUserSeeking = false;
     private bool _isDragging = false;
-    private int _seekPosition;
-    private int _clickSeekPosition = -1;
+    private double _seekPosition;
+    private double _clickSeekPosition = -1;
     private bool _suppressPositionUpdate = false;
     private CancellationTokenSource? _seekSuppressionCts;
 
@@ -30,10 +30,10 @@ public partial class CompactPlayerViewModel : ViewModelBase
     public string SongArtist => CurrentMetadata?.Artist ?? string.Empty;
     public string SongAlbum => CurrentMetadata?.Album ?? string.Empty;
     [ObservableProperty] private Bitmap? songArtwork;
-    [ObservableProperty] private int songDuration;
-    [ObservableProperty] private int currentPosition;
-    [ObservableProperty] private int displayPosition;
-    [ObservableProperty] private int currentVolume = 100;
+    [ObservableProperty] private double songDuration;
+    [ObservableProperty] private double currentPosition;
+    [ObservableProperty] private double displayPosition;
+    [ObservableProperty] private float currentVolume;
     [ObservableProperty] private bool isPlaying;
 
     public string PlayPauseIcon => IsPlaying ? "Pause" : "Play";
@@ -50,8 +50,8 @@ public partial class CompactPlayerViewModel : ViewModelBase
     public string VolumeIcon => CurrentVolume switch
     {
         >= 1 and < 25 => "Speaker0",
-        >= 26 and < 60 => "Speaker1",
-        >= 61 and <= 100 => "Speaker2",
+        >= 25 and < 66 => "Speaker1",
+        >= 66 and <= 100 => "Speaker2",
         _ => "SpeakerMute"
     };
 
@@ -61,7 +61,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
         _playbackControlService = playbackControlService;
         _storagePickerService = storagePickerService;
         _audioPlayerService = audioPlayerService;
-        _audioPlayerService.Volume = CurrentVolume;
+        CurrentVolume = _audioPlayerService.Volume;
 
         _audioPlayerService.PlaybackStarted += () =>
         {
@@ -132,7 +132,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
         };
 
         RepeatMode = _audioPlayerService.Repeat;
-        _audioPlayerService.RepeatChanged += repeat =>
+        _audioPlayerService.RepeatModeChanged += repeat =>
         {
             Dispatcher.UIThread.Post(() =>
             {
@@ -167,13 +167,13 @@ public partial class CompactPlayerViewModel : ViewModelBase
         _audioPlayerService.Repeat = value;
     }
 
-    partial void OnCurrentVolumeChanged(int value)
+    partial void OnCurrentVolumeChanged(float value)
     {
         OnPropertyChanged(nameof(VolumeIcon));
         _audioPlayerService.Volume = value;
     }
 
-    partial void OnDisplayPositionChanged(int value)
+    partial void OnDisplayPositionChanged(double value)
     {
         // Track the position the user is dragging to
         if (_isUserSeeking)
@@ -209,7 +209,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
     public async void EndInteraction()
     {
         // Called on pointer release
-        int targetPosition;
+        double targetPosition;
 
         if (_isDragging)
         {
@@ -230,7 +230,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
         _clickSeekPosition = -1;
     }
 
-    private async Task SuppressPositionUpdatesAndSeek(int targetPosition)
+    private async Task SuppressPositionUpdatesAndSeek(double targetPosition)
     {
         // Cancel previous suppression
         _seekSuppressionCts?.Cancel();
@@ -304,6 +304,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
         string? filePath = await _storagePickerService.PickAudioFileAsync();
         if (!string.IsNullOrEmpty(filePath))
         {
+            _audioPlayerService.ClearQueue();
             await _audioPlayerService.PlayFileAsync(filePath);
         }
     }

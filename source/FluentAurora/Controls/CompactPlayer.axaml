@@ -182,7 +182,7 @@
                         UseLayoutRounding="False"
                         VerticalAlignment="Center">
                     <ToolTip.Tip>
-                        <TextBlock Text="{Binding CurrentVolume, StringFormat='Volume: {0}%'}" />
+                        <TextBlock Text="{Binding CurrentVolume, StringFormat='Volume: {0:F0}%'}" />
                     </ToolTip.Tip>
                 </Slider>
 

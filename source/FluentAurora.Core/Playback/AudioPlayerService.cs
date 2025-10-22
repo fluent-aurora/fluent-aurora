@@ -19,6 +19,7 @@ public sealed class AudioPlayerService : IDisposable
 
     // Queue storage
     private readonly List<AudioMetadata> _queue = new List<AudioMetadata>();
+    private List<AudioMetadata>? _originalQueue;
     private readonly HashSet<string> _queuePaths = new HashSet<string>();
 
     // Playback pipeline
@@ -31,6 +32,7 @@ public sealed class AudioPlayerService : IDisposable
 
     // State
     private int _currentSongIndex = -1;
+    public bool IsShuffled = false;
     private float _volume = 100f; // 0-100
     private RepeatMode _repeat = RepeatMode.All;
     private bool _isIntentionalStop;
@@ -133,6 +135,46 @@ public sealed class AudioPlayerService : IDisposable
     }
 
     // Public: Playback controls
+
+    public void ToggleShuffle()
+    {
+        if (_queue.Count == 0)
+        {
+            return;
+        }
+
+        if (!IsShuffled)
+        {
+            _originalQueue = new List<AudioMetadata>(_queue);
+            AudioMetadata? currentSong = CurrentSong;
+            if (currentSong == null)
+            {
+                return;
+            }
+
+            List<AudioMetadata> restQueue = _queue.Where(song => song != currentSong).OrderBy(_ => Guid.NewGuid()).ToList();
+
+            _queue.Clear();
+            _queue.Add(currentSong);
+            _queue.AddRange(restQueue);
+
+            _currentSongIndex = 0;
+            IsShuffled = true;
+        }
+        else
+        {
+            if (_originalQueue != null)
+            {
+                AudioMetadata? currentSong = CurrentSong;
+                _queue.Clear();
+                _queue.AddRange(_originalQueue);
+                _currentSongIndex = currentSong != null ? _originalQueue.IndexOf(currentSong) : 0;
+            }
+            IsShuffled = false;
+        }
+        QueueChanged?.Invoke();
+    }
+
     public void PlayQueue(int startIndex = 0)
     {
         if (_queue.Count == 0)
@@ -413,7 +455,7 @@ public sealed class AudioPlayerService : IDisposable
                 DatabaseManager.AddSong(path);
                 metadata = await Task.Run(() => DatabaseManager.GetSongByFilePath(path)).ConfigureAwait(false);
             }
-            
+
             // If there was an error while adding the song to the database, create a temporary metadata
             metadata ??= new AudioMetadata { FilePath = path, Title = Path.GetFileNameWithoutExtension(path) };
 

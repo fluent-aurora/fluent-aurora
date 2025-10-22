@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
@@ -36,6 +38,9 @@ public partial class CompactPlayerViewModel : ViewModelBase
     [ObservableProperty] private float currentVolume;
     [ObservableProperty] private bool isPlaying;
 
+    private bool _isShuffled;
+    public string ShuffleIcon => _isShuffled ? "ArrowShuffleOff" : "ArrowShuffle";
+
     public string PlayPauseIcon => IsPlaying ? "Pause" : "Play";
 
     [ObservableProperty] private RepeatMode repeatMode = RepeatMode.One;
@@ -61,6 +66,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
         _playbackControlService = playbackControlService;
         _storagePickerService = storagePickerService;
         _audioPlayerService = audioPlayerService;
+        _isShuffled = _audioPlayerService.IsShuffled;
         CurrentVolume = _audioPlayerService.Volume;
 
         _audioPlayerService.PlaybackStarted += () =>
@@ -264,6 +270,14 @@ public partial class CompactPlayerViewModel : ViewModelBase
     private void ToggleExpand()
     {
         _playbackControlService.ToggleExpanded();
+    }
+
+    [RelayCommand]
+    private void ToggleShuffle()
+    {
+        _audioPlayerService.ToggleShuffle();
+        _isShuffled = _audioPlayerService.IsShuffled;
+        OnPropertyChanged(nameof(ShuffleIcon));
     }
 
     [RelayCommand]

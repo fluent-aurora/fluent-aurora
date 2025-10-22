@@ -233,10 +233,11 @@
                             Spacing="16">
 
                     <!-- Shuffle -->
-                    <Button Width="44"
-                            Height="44"
-                            ToolTip.Tip="Shuffle">
-                        <ic:SymbolIcon Symbol="ArrowShuffle" FontSize="20" />
+                    <Button Width="40"
+                            Height="32"
+                            ToolTip.Tip="Shuffle"
+                            Command="{Binding ToggleShuffleCommand}">
+                        <ic:SymbolIcon Symbol="{Binding ShuffleIcon}" FontSize="16" />
                     </Button>
 
                     <!-- Previous -->

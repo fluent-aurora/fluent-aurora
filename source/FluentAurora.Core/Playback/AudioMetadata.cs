@@ -19,7 +19,7 @@ public class AudioMetadata
     public string? FilePath { get; set; }
 
     // Methods
-    public string DisplayTitle => !string.IsNullOrWhiteSpace(Title) ? Path.GetFileNameWithoutExtension(Title) : "Unknown Title";
+        public string DisplayTitle => !string.IsNullOrWhiteSpace(Title) ? Title.Trim() : !string.IsNullOrWhiteSpace(FilePath) ? Path.GetFileNameWithoutExtension(FilePath.Trim()) : "Unknown Title";
 
     public static string[] GetSupportedExtensions() => [".mp3", ".ogg", ".wav", ".flac"];
 

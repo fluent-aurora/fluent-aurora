@@ -47,14 +47,24 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore "source/FluentAurora/FluentAurora.csproj"
 
-      - name: Build the app
-        run: dotnet publish -c Release -r win-x64 --self-contained false -p:DebugType=none -p:PublishReadyToRun=false -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:PublishTrimmed=false  -o publish/desktop "source/FluentAurora/FluentAurora.csproj"
+      - name: Build (Packed as Single File)
+        run: dotnet publish "source/FluentAurora/FluentAurora.csproj" -c Release -r win-x64 --self-contained false -p:DebugType=none -p:PublishReadyToRun=false -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:PublishTrimmed=false -o publish/desktop_single
 
-      - name: Upload artifact
+      - name: Build (Unpacked)
+        run: dotnet publish "source/FluentAurora/FluentAurora.csproj" -c Release -r win-x64 --self-contained false -p:DebugType=none -p:PublishReadyToRun=false -p:PublishSingleFile=false -p:IncludeAllContentForSelfExtract=false -p:PublishTrimmed=false -o publish/desktop_extracted
+
+      - name: Upload artifact (Single File)
         uses: actions/upload-artifact@v4
         with:
-          name: fluent_aurora
-          path: ./publish/desktop/
+          name: "Fluent Aurora"
+          path: ./publish/desktop_single/
+          if-no-files-found: error
+
+      - name: Upload artifact (Unpacked)
+        uses: actions/upload-artifact@v4
+        with:
+          name: "Fluent Aurora (Unpacked)"
+          path: ./publish/desktop_extracted/
           if-no-files-found: error
 
   create-release:

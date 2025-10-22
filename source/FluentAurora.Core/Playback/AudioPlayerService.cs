@@ -42,7 +42,7 @@ public sealed class AudioPlayerService : IDisposable
     public bool IsPlaying { get; private set; }
     public bool IsMediaReady { get; private set; }
 
-    public IReadOnlyList<AudioMetadata> Queue => _queue.AsReadOnly();
+    public List<AudioMetadata> Queue => _queue;
     public int CurrentIndex => _currentSongIndex;
 
     public RepeatMode Repeat
@@ -76,6 +76,7 @@ public sealed class AudioPlayerService : IDisposable
     public event Action? MediaEnded;
     public event Action<AudioMetadata>? MetadataLoaded;
     public event Action<RepeatMode>? RepeatModeChanged;
+    public event Action? QueueChanged;
 
     // Constructor
     public AudioPlayerService()
@@ -105,6 +106,7 @@ public sealed class AudioPlayerService : IDisposable
 
         _queue.Add(song);
         Logger.Info($"Enqueued song: {song.Title}");
+        QueueChanged?.Invoke();
     }
 
     public void Enqueue(IEnumerable<AudioMetadata> songs)
@@ -117,6 +119,7 @@ public sealed class AudioPlayerService : IDisposable
 
         _queue.AddRange(newSongs);
         Logger.Info($"Enqueued {newSongs.Count} songs");
+        QueueChanged?.Invoke();
     }
 
     public void ClearQueue()
@@ -126,6 +129,7 @@ public sealed class AudioPlayerService : IDisposable
         _currentSongIndex = -1;
         Stop();
         Logger.Info("Queue cleared");
+        QueueChanged?.Invoke();
     }
 
     // Public: Playback controls
@@ -417,6 +421,7 @@ public sealed class AudioPlayerService : IDisposable
             if (!string.IsNullOrEmpty(metadata.FilePath)) _queuePaths.Add(metadata.FilePath);
             _currentSongIndex = _queue.Count - 1;
             Logger.Info($"Added new song to queue: {metadata.Title}");
+            QueueChanged?.Invoke();
         }
         else
         {

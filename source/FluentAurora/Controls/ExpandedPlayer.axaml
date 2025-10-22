@@ -32,14 +32,13 @@
                 </Button>
             </Grid>
 
-            <!-- Album Art and Info -->
-            <ScrollViewer Grid.Row="1"
-                          HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto">
+            <!-- Current Song and Song Queue -->
+            <Grid Grid.Row="1">
+                <!-- Album Art and Info (Currently Playing Song) -->
                 <StackPanel VerticalAlignment="Center"
                             HorizontalAlignment="Center"
-                            Spacing="30">
-
+                            Spacing="30"
+                            IsVisible="{Binding !IsQueueVisible}">
                     <!-- Large Album Art with shadow -->
                     <Border Width="400"
                             Height="400"
@@ -103,7 +102,84 @@
                                                      MaxWidth="500" />
                     </StackPanel>
                 </StackPanel>
-            </ScrollViewer>
+
+                <!-- Song Queue -->
+                <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+                        Opacity="0.97"
+                        IsVisible="{Binding IsQueueVisible}"
+                        CornerRadius="12"
+                        Padding="20,10"
+                        Margin="0,10,0,0">
+                    <Grid RowDefinitions="Auto,*">
+                        <!-- Header -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                            <TextBlock Text="Queue"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.8"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Column="1"
+                                    Command="{Binding ToggleQueueCommand}"
+                                    ToolTip.Tip="Close Queue">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Song List -->
+                        <ScrollViewer Grid.Row="1"
+                                      x:Name="QueueScrollViewer"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding Queue}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Command="{Binding DataContext.PlayQueueItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Background="Transparent"
+                                                BorderBrush="Transparent"
+                                                Padding="0"
+                                                Margin="0,2,14,2"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Stretch">
+                                            <Border Padding="8,6"
+                                                    CornerRadius="6"
+                                                    Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                                    Cursor="Hand">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <!-- Artwork -->
+                                                    <Border Width="40" Height="40"
+                                                            CornerRadius="6"
+                                                            Background="#FF2D2D2D"
+                                                            Margin="0,0,12,0">
+                                                        <ic:SymbolIcon Symbol="MusicNote2"
+                                                                       FontSize="18"
+                                                                       Opacity="0.5"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                    </Border>
+
+                                                    <!-- Title/Artist -->
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" />
+                                                        <TextBlock Text="{Binding Artist}" FontSize="12" Opacity="0.7" />
+                                                    </StackPanel>
+
+                                                    <!-- Duration -->
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding Duration, Converter={x:Static converters:PositionToTimeConverter.Instance}}"
+                                                               FontSize="12"
+                                                               Opacity="0.6"
+                                                               HorizontalAlignment="Right"
+                                                               VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
 
             <!-- Progress Section -->
             <StackPanel Grid.Row="2" Spacing="8" Margin="0,20,0,0">
@@ -211,7 +287,8 @@
                                 <ic:SymbolIcon Symbol="FolderOpen" FontSize="18" />
                             </Button>
 
-                            <Button ToolTip.Tip="Show Playlist">
+                            <Button ToolTip.Tip="Show Queue"
+                                    Command="{Binding ToggleQueueCommand}">
                                 <ic:SymbolIcon Symbol="List" FontSize="18" />
                             </Button>
                         </StackPanel>

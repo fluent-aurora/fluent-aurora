@@ -112,4 +112,14 @@ public partial class ExpandedPlayerViewModel : CompactPlayerViewModel
         }
         _audioPlayerService.PlayQueue(item.Index);
     }
+
+    [RelayCommand]
+    private void RemoveSong(QueueItemViewModel item)
+    {
+        if (item?.Song == null || item.Song.FilePath == null)
+        {
+            return;
+        }
+        _audioPlayerService.RemoveFromQueue(item.Song.FilePath);
+    }
 }

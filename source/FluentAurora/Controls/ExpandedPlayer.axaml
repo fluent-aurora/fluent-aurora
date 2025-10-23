@@ -7,7 +7,8 @@
              xmlns:controls="using:FluentAurora.Controls"
              xmlns:vm="clr-namespace:FluentAurora.ViewModels"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700"
-             x:Class="FluentAurora.Controls.ExpandedPlayer">
+             x:Class="FluentAurora.Controls.ExpandedPlayer"
+             x:Name="ExpandedPlayerRoot">
     <Design.DataContext>
         <vm:ExpandedPlayerViewModel />
     </Design.DataContext>
@@ -144,7 +145,17 @@
                                                     CornerRadius="6"
                                                     Cursor="Hand"
                                                     Background="{Binding IsCurrentlyPlaying, Converter={x:Static converters:QueueBoolToBackgroundConverter.Instance}}">
-
+                                                <Border.ContextFlyout>
+                                                    <MenuFlyout>
+                                                        <MenuItem Header="Remove Song"
+                                                                  Command="{Binding DataContext.RemoveSongCommand, ElementName=ExpandedPlayerRoot}"
+                                                                  CommandParameter="{Binding}">
+                                                            <MenuItem.Icon>
+                                                                <ic:SymbolIcon Symbol="Delete" />
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                    </MenuFlyout>
+                                                </Border.ContextFlyout>
                                                 <Grid ColumnDefinitions="Auto,*,Auto">
                                                     <!-- Icon -->
                                                     <Border Grid.Column="0"

@@ -185,6 +185,26 @@ public partial class LibraryViewModel : ViewModelBase
         _audioPlayerService.Enqueue(songs);
         _audioPlayerService.PlayQueue();
     }
+    
+    [RelayCommand]
+    private void PlayPlaylistShuffled(FolderPlaylistViewModel playlist)
+    {
+        if (playlist == null)
+        {
+            Logger.Warning("Playlist is null");
+            return;
+        }
+
+        Logger.Info($"Queueing playlist: {playlist.Name}");
+        _audioPlayerService.IsShuffled = false; // Reset shuffle state
+        _audioPlayerService.ClearQueue();
+
+        // Load songs without artwork for playback
+        List<AudioMetadata> songs = _databaseManager.GetSongsFolder(playlist.Path);
+        _audioPlayerService.Enqueue(songs);
+        _audioPlayerService.ToggleShuffle();
+        _audioPlayerService.PlayQueue();
+    }
 
     [RelayCommand]
     public void DeletePlaylist(FolderPlaylistViewModel playlist)

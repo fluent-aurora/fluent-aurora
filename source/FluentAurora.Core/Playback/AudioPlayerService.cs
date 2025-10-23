@@ -314,33 +314,66 @@ public sealed class AudioPlayerService : IDisposable
 
         if (!IsShuffled)
         {
+            // Shuffling the queue
             _originalQueue = new List<AudioMetadata>(_queue);
             AudioMetadata? currentSong = CurrentSong;
+
             if (currentSong == null)
             {
-                return;
+                // Shuffle the entire queue since no song is playing
+                _queue.Clear();
+                _queue.AddRange(_originalQueue.OrderBy(_ => Guid.NewGuid()));
+                _currentSongIndex = -1;
+                Logger.Info("Shuffled queue (no song selected)");
+            }
+            else
+            {
+                // Song is playing, keep it at position 0 and shuffle the rest of the songs in the queue
+                List<AudioMetadata> restQueue = _queue.Where(song => song != currentSong).OrderBy(_ => Guid.NewGuid()).ToList();
+                _queue.Clear();
+                _queue.Add(currentSong);
+                _queue.AddRange(restQueue);
+                _currentSongIndex = 0;
+                Logger.Info($"Shuffled queue with '{currentSong.Title}' as first song");
             }
 
-            List<AudioMetadata> restQueue = _queue.Where(song => song != currentSong).OrderBy(_ => Guid.NewGuid()).ToList();
-
-            _queue.Clear();
-            _queue.Add(currentSong);
-            _queue.AddRange(restQueue);
-
-            _currentSongIndex = 0;
             IsShuffled = true;
         }
         else
         {
+            // Restoring original order of the queue
             if (_originalQueue != null)
             {
                 AudioMetadata? currentSong = CurrentSong;
                 _queue.Clear();
                 _queue.AddRange(_originalQueue);
-                _currentSongIndex = currentSong != null ? _originalQueue.IndexOf(currentSong) : 0;
+
+                if (currentSong != null)
+                {
+                    // Find the current song in the queue
+                    _currentSongIndex = _originalQueue.IndexOf(currentSong);
+                    if (_currentSongIndex == -1)
+                    {
+                        // Song not found??? Rebind to a first song in the queue if this happens (shouldn't though)
+                        _currentSongIndex = 0;
+                        Logger.Warning($"Could not find '{currentSong.Title}' in original queue");
+                    }
+                    else
+                    {
+                        Logger.Info($"Unshuffled queue, current song at index {_currentSongIndex}");
+                    }
+                }
+                else
+                {
+                    // No song selected
+                    _currentSongIndex = -1;
+                    Logger.Info("Unshuffled queue (no song selected)");
+                }
             }
+
             IsShuffled = false;
         }
+
         QueueChanged?.Invoke();
     }
 

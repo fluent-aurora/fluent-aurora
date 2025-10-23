@@ -13,6 +13,9 @@ public class DatabaseManager
     // Properties
     public static string ConnectionString => $"Data Source={PathResolver.Database};Pooling=True";
     private static readonly ArtworkCache _artworkCache = new ArtworkCache();
+    
+    // Events
+    public static event Action<string>? SongDeleted;
 
     // Constructors
     public DatabaseManager()
@@ -122,6 +125,52 @@ public class DatabaseManager
             throw;
         }
     }
+
+    public static void DeleteSong(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            Logger.Warning("Cannot delete song: file path is null or empty");
+            return;
+        }
+
+        Logger.Info($"Deleting song from database: {filePath}");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        try
+        {
+            using SqliteCommand command = new SqliteCommand(
+                "DELETE FROM Songs WHERE FilePath = @FilePath", connection, transaction);
+            command.Parameters.AddWithValue("@FilePath", filePath);
+
+            int rowsAffected = command.ExecuteNonQuery();
+
+            if (rowsAffected > 0)
+            {
+                Logger.Info($"Deleted song: {filePath}");
+                _artworkCache.Clear();
+            }
+            else
+            {
+                Logger.Warning($"No song found with FilePath: {filePath}");
+            }
+
+            transaction.Commit();
+            
+            SongDeleted?.Invoke(filePath);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to delete song '{filePath}': {ex.Message}");
+            transaction.Rollback();
+            throw;
+        }
+    }
+
 
     private void ProcessAudioFiles(List<string> audioFiles, SqliteConnection connection, SqliteTransaction transaction, IndexingContext context)
     {

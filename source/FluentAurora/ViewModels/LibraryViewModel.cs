@@ -78,6 +78,10 @@ public partial class LibraryViewModel : ViewModelBase
     public LibraryViewModel(DatabaseManager databaseManager, StoragePickerService storagePickerService, AudioPlayerService audioPlayerService)
     {
         _databaseManager = databaseManager;
+        DatabaseManager.SongDeleted += filePath =>
+        {
+            LoadFolders();
+        };
         _storagePickerService = storagePickerService;
         _audioPlayerService = audioPlayerService;
         LoadFolders();
@@ -169,7 +173,13 @@ public partial class LibraryViewModel : ViewModelBase
         }
 
         _audioPlayerService.ClearQueue();
-        await _audioPlayerService.PlayFileAsync(song.FilePath);
+        try
+        {
+            await _audioPlayerService.PlayFileAsync(song.FilePath);
+        }
+        catch (FileNotFoundException)
+        {
+        }
     }
 
     [RelayCommand]

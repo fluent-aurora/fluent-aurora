@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
@@ -319,7 +317,13 @@ public partial class CompactPlayerViewModel : ViewModelBase
         if (!string.IsNullOrEmpty(filePath))
         {
             _audioPlayerService.ClearQueue();
-            await _audioPlayerService.PlayFileAsync(filePath);
+            try
+            {
+                await _audioPlayerService.PlayFileAsync(filePath);
+            }
+            catch (FileNotFoundException)
+            {
+            }
         }
     }
 }

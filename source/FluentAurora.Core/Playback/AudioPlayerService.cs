@@ -86,6 +86,8 @@ public sealed class AudioPlayerService : IDisposable
         Logger.Info("Initializing AudioPlayerService (CSCore)");
         InitializeSoundOut();
         Logger.Info("AudioPlayerService initialized successfully");
+
+        DatabaseManager.SongDeleted += OnSongDeleted;
     }
 
     // Methods
@@ -132,6 +134,93 @@ public sealed class AudioPlayerService : IDisposable
         Stop();
         Logger.Info("Queue cleared");
         QueueChanged?.Invoke();
+    }
+
+    public void RemoveFromQueue(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return;
+        }
+
+        int index = _queue.FindIndex(s => s.FilePath == filePath);
+        if (index == -1)
+        {
+            Logger.Debug($"Song not in queue: {filePath}");
+            return;
+        }
+
+        RemoveFromQueueByIndex(index);
+    }
+
+    public void RemoveFromQueueByIndex(int index)
+    {
+        if (index < 0 || index >= _queue.Count)
+        {
+            Logger.Warning($"Invalid queue index: {index}");
+            return;
+        }
+
+        AudioMetadata removedSong = _queue[index];
+        string? filePath = removedSong.FilePath;
+        _queue.RemoveAt(index);
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            _queuePaths.Remove(filePath);
+        }
+        
+        // Remove from originalQueue if the queue has been shuffled
+        if (IsShuffled && _originalQueue != null)
+        {
+            _originalQueue.Remove(removedSong);
+        }
+
+        Logger.Info($"Removed song from queue: {removedSong.Title}");
+
+        // Handle current song index adjustments
+        bool wasPlayingRemovedSong = index == _currentSongIndex;
+        bool removedBeforeCurrent = index < _currentSongIndex;
+
+        if (wasPlayingRemovedSong)
+        {
+            // Trying to play the removed song
+            HandleRemovedCurrentSong(index);
+        }
+        else if (removedBeforeCurrent)
+        {
+            // Song was before the currently playing one, adjust the index
+            _currentSongIndex--;
+        }
+
+        QueueChanged?.Invoke();
+    }
+
+    private void HandleRemovedCurrentSong(int removedIndex)
+    {
+        Stop();
+
+        // Queue Empty
+        if (_queue.Count == 0)
+        {
+            _currentSongIndex = -1;
+            Logger.Info("Queue is now empty after removing current song");
+            return;
+        }
+        
+        if (removedIndex < _queue.Count)
+        {
+            // Try to play next song after removal
+            _currentSongIndex = removedIndex;
+            Logger.Info($"Playing next song after removal: {_queue[_currentSongIndex].Title}");
+            _ = PlayFileAsync(_queue[_currentSongIndex].FilePath!);
+        }
+        else
+        {
+            // Try to play last song since the removed one was the last one in the queue
+            _currentSongIndex = _queue.Count - 1;
+            Logger.Info($"Playing previous song after removal: {_queue[_currentSongIndex].Title}");
+            _ = PlayFileAsync(_queue[_currentSongIndex].FilePath!);
+        }
     }
 
     // Public: Playback controls
@@ -196,7 +285,9 @@ public sealed class AudioPlayerService : IDisposable
         if (!IsValidPath(path))
         {
             Logger.Warning($"Invalid media path: {path}");
-            return;
+            Logger.Info("Deleting the song from the database");
+            DatabaseManager.DeleteSong(path);
+            throw new FileNotFoundException($"Media file not found: {path}");
         }
 
         await PrepareForNewFile(path).ConfigureAwait(false);
@@ -532,6 +623,12 @@ public sealed class AudioPlayerService : IDisposable
         }
     }
 
+    private void OnSongDeleted(string filePath)
+    {
+        Logger.Info($"Received notification that song was deleted from database: {filePath}");
+        RemoveFromQueue(filePath);
+    }
+
     private bool IsEndOfFile()
     {
         if (_waveSource == null)
@@ -641,6 +738,7 @@ public sealed class AudioPlayerService : IDisposable
         }
 
         DisposeCurrentMedia();
+        DatabaseManager.SongDeleted -= OnSongDeleted;
         _isDisposed = true;
         Logger.Info("AudioPlayerService disposed");
     }

@@ -37,7 +37,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
     [ObservableProperty] private bool isPlaying;
 
     private bool _isShuffled;
-    public string ShuffleIcon => _isShuffled ? "ArrowShuffleOff" : "ArrowShuffle";
+    public string ShuffleIcon => _isShuffled ? "ArrowShuffle" : "ArrowShuffleOff";
 
     public string PlayPauseIcon => IsPlaying ? "Pause" : "Play";
 

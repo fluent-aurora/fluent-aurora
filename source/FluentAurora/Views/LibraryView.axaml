@@ -145,6 +145,13 @@
                                                                 <ic:SymbolIcon Symbol="Add" />
                                                             </MenuItem.Icon>
                                                         </MenuItem>
+                                                        <MenuItem Header="Remove Song"
+                                                                  Command="{Binding DataContext.RemoveSongCommand, ElementName=LibraryRoot}"
+                                                                  CommandParameter="{Binding}">
+                                                            <MenuItem.Icon>
+                                                                <ic:SymbolIcon Symbol="Delete" />
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
                                                     </MenuFlyout>
                                                 </Border.ContextFlyout>
 

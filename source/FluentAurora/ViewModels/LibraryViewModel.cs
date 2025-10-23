@@ -78,7 +78,7 @@ public partial class LibraryViewModel : ViewModelBase
     public LibraryViewModel(DatabaseManager databaseManager, StoragePickerService storagePickerService, AudioPlayerService audioPlayerService)
     {
         _databaseManager = databaseManager;
-        DatabaseManager.SongDeleted += filePath =>
+        DatabaseManager.SongDeleted += _ =>
         {
             LoadFolders();
         };
@@ -164,6 +164,25 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    public void PlayPlaylist(FolderPlaylistViewModel playlist)
+    {
+        if (playlist == null)
+        {
+            Logger.Warning("Playlist is null");
+            return;
+        }
+
+        Logger.Info($"Queueing playlist: {playlist.Name}");
+
+        _audioPlayerService.ClearQueue();
+
+        // Load songs without artwork for playback
+        List<AudioMetadata> songs = _databaseManager.GetSongsFolder(playlist.Path);
+        _audioPlayerService.Enqueue(songs);
+        _audioPlayerService.PlayQueue();
+    }
+
+    [RelayCommand]
     public async Task PlaySong(AudioMetadata song)
     {
         if (song == null || string.IsNullOrEmpty(song.FilePath))
@@ -189,21 +208,8 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public void PlayPlaylist(FolderPlaylistViewModel playlist)
+    public void RemoveSong(AudioMetadata song)
     {
-        if (playlist == null)
-        {
-            Logger.Warning("Playlist is null");
-            return;
-        }
-
-        Logger.Info($"Queueing playlist: {playlist.Name}");
-
-        _audioPlayerService.ClearQueue();
-
-        // Load songs without artwork for playback
-        List<AudioMetadata> songs = _databaseManager.GetSongsFolder(playlist.Path);
-        _audioPlayerService.Enqueue(songs);
-        _audioPlayerService.PlayQueue();
+        DatabaseManager.DeleteSong(song.FilePath!);
     }
 }

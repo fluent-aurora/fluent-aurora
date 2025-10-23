@@ -107,6 +107,10 @@
                                                     CommandParameter="{Binding}" ToolTip.Tip="Play All">
                                                 <ic:SymbolIcon Symbol="Play" />
                                             </Button>
+                                            <Button Command="{Binding DataContext.DeletePlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" ToolTip.Tip="Delete Playlist">
+                                                <ic:SymbolIcon Symbol="Delete" />
+                                            </Button>
                                         </StackPanel>
                                     </DockPanel>
                                 </Expander.Header>

@@ -88,6 +88,7 @@ public sealed class AudioPlayerService : IDisposable
         Logger.Info("AudioPlayerService initialized successfully");
 
         DatabaseManager.SongDeleted += OnSongDeleted;
+        DatabaseManager.SongsDeleted += OnSongsDeleted;
     }
 
     // Methods
@@ -153,6 +154,82 @@ public sealed class AudioPlayerService : IDisposable
         RemoveFromQueueByIndex(index);
     }
 
+    public void RemoveFromQueue(List<string> filePaths)
+    {
+        if (filePaths == null || filePaths.Count == 0)
+        {
+            return;
+        }
+
+        Logger.Info($"Removing {filePaths.Count} songs from queue");
+        HashSet<string> pathsToRemove = new HashSet<string>(filePaths.Where(path => !string.IsNullOrEmpty(path)),StringComparer.OrdinalIgnoreCase);
+
+        if (pathsToRemove.Count == 0)
+        {
+            return;
+        }
+
+        // Find all indices to remove
+        List<int> indicesToRemove = new List<int>();
+        for (int i = 0; i < _queue.Count; i++)
+        {
+            if (!string.IsNullOrEmpty(_queue[i].FilePath) && pathsToRemove.Contains(_queue[i].FilePath!))
+            {
+                indicesToRemove.Add(i);
+            }
+        }
+
+        if (indicesToRemove.Count == 0)
+        {
+            Logger.Debug($"None of the {filePaths.Count} songs are in queue");
+            return;
+        }
+
+        Logger.Info($"Found {indicesToRemove.Count} songs to remove from queue");
+
+        // Check if currently playing song will be removed
+        bool removingCurrentSong = indicesToRemove.Contains(_currentSongIndex);
+        int originalCurrentIndex = _currentSongIndex;
+
+        // Sort in descending order
+        indicesToRemove.Sort((a, b) => b.CompareTo(a));
+        
+        // Remove from the highest index
+        foreach (int index in indicesToRemove)
+        {
+            AudioMetadata removedSong = _queue[index];
+            string? filePath = removedSong.FilePath;
+
+            _queue.RemoveAt(index);
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                _queuePaths.Remove(filePath);
+            }
+
+            // Update originalQueue if shuffling was enabled
+            if (IsShuffled && _originalQueue != null)
+            {
+                _originalQueue.Remove(removedSong);
+            }
+
+            Logger.Debug($"Removed from queue: {removedSong.Title}");
+        }
+
+        // Adjust current song index
+        if (removingCurrentSong)
+        {
+            HandleRemovedCurrentSong(originalCurrentIndex);
+        }
+        else
+        {
+            // Calculate how many songs were removed before current song
+            int removedBeforeCurrent = indicesToRemove.Count(i => i < originalCurrentIndex);
+            _currentSongIndex -= removedBeforeCurrent;
+        }
+
+        QueueChanged?.Invoke();
+    }
+
     public void RemoveFromQueueByIndex(int index)
     {
         if (index < 0 || index >= _queue.Count)
@@ -168,7 +245,7 @@ public sealed class AudioPlayerService : IDisposable
         {
             _queuePaths.Remove(filePath);
         }
-        
+
         // Remove from originalQueue if the queue has been shuffled
         if (IsShuffled && _originalQueue != null)
         {
@@ -206,7 +283,7 @@ public sealed class AudioPlayerService : IDisposable
             Logger.Info("Queue is now empty after removing current song");
             return;
         }
-        
+
         if (removedIndex < _queue.Count)
         {
             // Try to play next song after removal
@@ -627,6 +704,12 @@ public sealed class AudioPlayerService : IDisposable
     {
         Logger.Info($"Received notification that song was deleted from database: {filePath}");
         RemoveFromQueue(filePath);
+    }
+
+    private void OnSongsDeleted(List<string> files)
+    {
+        Logger.Info($"Received notification that songs were deleted from the database: {files.Count}");
+        RemoveFromQueue(files);
     }
 
     private bool IsEndOfFile()

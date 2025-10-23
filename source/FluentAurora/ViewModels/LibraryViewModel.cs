@@ -82,6 +82,10 @@ public partial class LibraryViewModel : ViewModelBase
         {
             LoadFolders();
         };
+        DatabaseManager.FolderDeleted += _ =>
+        {
+            LoadFolders();
+        };
         _storagePickerService = storagePickerService;
         _audioPlayerService = audioPlayerService;
         LoadFolders();
@@ -180,6 +184,18 @@ public partial class LibraryViewModel : ViewModelBase
         List<AudioMetadata> songs = _databaseManager.GetSongsFolder(playlist.Path);
         _audioPlayerService.Enqueue(songs);
         _audioPlayerService.PlayQueue();
+    }
+
+    [RelayCommand]
+    public void DeletePlaylist(FolderPlaylistViewModel playlist)
+    {
+        if (playlist == null)
+        {
+            Logger.Warning("Playlist is null");
+            return;
+        }
+        Logger.Info($"Deleting playlist: {playlist.Name}");
+        DatabaseManager.DeleteFolder(playlist.Path);
     }
 
     [RelayCommand]

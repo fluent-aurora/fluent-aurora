@@ -13,9 +13,11 @@ public class DatabaseManager
     // Properties
     public static string ConnectionString => $"Data Source={PathResolver.Database};Pooling=True";
     private static readonly ArtworkCache _artworkCache = new ArtworkCache();
-    
+
     // Events
     public static event Action<string>? SongDeleted;
+    public static event Action<string>? FolderDeleted;
+    public static event Action<List<string>>? SongsDeleted;
 
     // Constructors
     public DatabaseManager()
@@ -160,7 +162,7 @@ public class DatabaseManager
             }
 
             transaction.Commit();
-            
+
             SongDeleted?.Invoke(filePath);
         }
         catch (Exception ex)
@@ -171,6 +173,52 @@ public class DatabaseManager
         }
     }
 
+    public static void DeleteFolder(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath))
+        {
+            Logger.Warning("Cannot delete folder: folder path is null or empty");
+            return;
+        }
+
+        Logger.Info($"Deleting folder and all songs from database: {folderPath}");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        try
+        {
+            // First, get all song file paths in this folder
+            List<string> deletedSongPaths = GetSongPathsInFolder(connection, transaction, folderPath);
+            
+            int songsDeleted = DeleteSongsInFolder(connection, transaction, folderPath);
+            int foldersDeleted = DeleteFolderRecord(connection, transaction, folderPath);
+
+            transaction.Commit();
+
+            if (foldersDeleted > 0)
+            {
+                Logger.Info($"Deleted folder '{folderPath}' and {songsDeleted} songs");
+                _artworkCache.Clear();
+
+                // Invoke events
+                FolderDeleted?.Invoke(folderPath);
+                SongsDeleted?.Invoke(deletedSongPaths);
+            }
+            else
+            {
+                Logger.Warning($"No folder found with path: {folderPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to delete folder '{folderPath}': {ex.Message}");
+            transaction.Rollback();
+            throw;
+        }
+    }
 
     private void ProcessAudioFiles(List<string> audioFiles, SqliteConnection connection, SqliteTransaction transaction, IndexingContext context)
     {
@@ -413,6 +461,56 @@ public class DatabaseManager
         }
 
         return results;
+    }
+
+    private static List<string> GetSongPathsInFolder(SqliteConnection connection, SqliteTransaction transaction, string folderPath)
+    {
+        List<string> songPaths = new List<string>();
+
+        const string query = @"
+        SELECT s.FilePath
+        FROM Songs s
+        INNER JOIN Folders f ON s.FolderId = f.Id
+        WHERE f.Path = @FolderPath";
+
+        using SqliteCommand command = new SqliteCommand(query, connection, transaction);
+        command.Parameters.AddWithValue("@FolderPath", folderPath);
+
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            string? filePath = reader.IsDBNull(0) ? null : reader.GetString(0);
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                songPaths.Add(filePath);
+            }
+        }
+
+        return songPaths;
+    }
+
+    private static int DeleteSongsInFolder(SqliteConnection connection, SqliteTransaction transaction, string folderPath)
+    {
+        const string deleteSongsQuery = @"
+        DELETE FROM Songs
+        WHERE FolderId IN (
+            SELECT Id FROM Folders WHERE Path = @FolderPath
+        )";
+
+        using SqliteCommand command = new SqliteCommand(deleteSongsQuery, connection, transaction);
+        command.Parameters.AddWithValue("@FolderPath", folderPath);
+
+        return command.ExecuteNonQuery();
+    }
+
+    private static int DeleteFolderRecord(SqliteConnection connection, SqliteTransaction transaction, string folderPath)
+    {
+        const string deleteFolderQuery = "DELETE FROM Folders WHERE Path = @FolderPath";
+
+        using SqliteCommand command = new SqliteCommand(deleteFolderQuery, connection, transaction);
+        command.Parameters.AddWithValue("@FolderPath", folderPath);
+
+        return command.ExecuteNonQuery();
     }
 
     // Indexing Context Class

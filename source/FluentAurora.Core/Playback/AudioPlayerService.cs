@@ -77,6 +77,7 @@ public sealed class AudioPlayerService : IDisposable
     public event Action? MediaReady;
     public event Action? MediaEnded;
     public event Action<AudioMetadata>? MetadataLoaded;
+    public event Action? MetadataCleared;
     public event Action<RepeatMode>? RepeatModeChanged;
     public event Action? QueueChanged;
 
@@ -132,8 +133,8 @@ public sealed class AudioPlayerService : IDisposable
         _queue.Clear();
         _queuePaths.Clear();
         _currentSongIndex = -1;
-        Stop();
         Logger.Info("Queue cleared");
+        MetadataCleared?.Invoke();
         QueueChanged?.Invoke();
     }
 
@@ -162,7 +163,7 @@ public sealed class AudioPlayerService : IDisposable
         }
 
         Logger.Info($"Removing {filePaths.Count} songs from queue");
-        HashSet<string> pathsToRemove = new HashSet<string>(filePaths.Where(path => !string.IsNullOrEmpty(path)),StringComparer.OrdinalIgnoreCase);
+        HashSet<string> pathsToRemove = new HashSet<string>(filePaths.Where(path => !string.IsNullOrEmpty(path)), StringComparer.OrdinalIgnoreCase);
 
         if (pathsToRemove.Count == 0)
         {
@@ -193,7 +194,7 @@ public sealed class AudioPlayerService : IDisposable
 
         // Sort in descending order
         indicesToRemove.Sort((a, b) => b.CompareTo(a));
-        
+
         // Remove from the highest index
         foreach (int index in indicesToRemove)
         {
@@ -280,7 +281,9 @@ public sealed class AudioPlayerService : IDisposable
         if (_queue.Count == 0)
         {
             _currentSongIndex = -1;
+            IsMediaReady = false;
             Logger.Info("Queue is now empty after removing current song");
+            MetadataCleared?.Invoke();
             return;
         }
 

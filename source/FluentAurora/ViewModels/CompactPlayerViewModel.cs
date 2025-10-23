@@ -135,6 +135,14 @@ public partial class CompactPlayerViewModel : ViewModelBase
             });
         };
 
+        _audioPlayerService.MetadataCleared += () =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                ResetMetadata();
+            });
+        };
+
         RepeatMode = _audioPlayerService.Repeat;
         _audioPlayerService.RepeatModeChanged += repeat =>
         {
@@ -147,6 +155,29 @@ public partial class CompactPlayerViewModel : ViewModelBase
     }
 
     // Methods
+    private void ResetMetadata()
+    {
+        Logger.Debug("Resetting player metadata");
+
+        // Dispose artwork
+        SongArtwork?.Dispose();
+        SongArtwork = null;
+
+        // Clear metadata
+        CurrentMetadata = null;
+
+        // Reset playback state
+        SongDuration = 0;
+        CurrentPosition = 0;
+        DisplayPosition = 0;
+
+        // Notify UI of changes
+        OnPropertyChanged(nameof(SongTitle));
+        OnPropertyChanged(nameof(SongArtist));
+        OnPropertyChanged(nameof(SongAlbum));
+        OnPropertyChanged(nameof(SongArtwork));
+    }
+    
     partial void OnIsPlayingChanged(bool value)
     {
         OnPropertyChanged(nameof(PlayPauseIcon));

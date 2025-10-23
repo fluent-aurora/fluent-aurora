@@ -75,6 +75,12 @@ public partial class LibraryViewModel : ViewModelBase
 
     [ObservableProperty] private FolderPlaylistViewModel? selectedPlaylist;
 
+    // Indexing progress properties
+    [ObservableProperty] private bool isIndexing = false;
+    [ObservableProperty] private int songsIndexed = 0;
+    [ObservableProperty] private int totalSongsToIndex = 0;
+    [ObservableProperty] private string indexingFolderName = string.Empty;
+
     public LibraryViewModel(DatabaseManager databaseManager, StoragePickerService storagePickerService, AudioPlayerService audioPlayerService)
     {
         _databaseManager = databaseManager;
@@ -127,7 +133,7 @@ public partial class LibraryViewModel : ViewModelBase
     private void LoadFolders() => _ = LoadFoldersAsync();
 
     [RelayCommand]
-    public async Task AddFolder()
+    private async Task AddFolder()
     {
         try
         {
@@ -139,6 +145,7 @@ public partial class LibraryViewModel : ViewModelBase
             }
 
             Logger.Debug($"Indexing folder: {folderPath}");
+            IndexingFolderName = Path.GetFileName(folderPath);
 
             // Run indexing in background
             await Task.Run(() =>
@@ -154,7 +161,22 @@ public partial class LibraryViewModel : ViewModelBase
                     return;
                 }
 
-                _databaseManager.AddSongs(audioFiles);
+                IsIndexing = true;
+                TotalSongsToIndex = audioFiles.Count;
+                SongsIndexed = 0;
+                
+                // Indexing batch size to make indexing faster
+                const int BATCH_SIZE = 10;
+                for (int i = 0; i < audioFiles.Count; i += BATCH_SIZE)
+                {
+                    int currentBatchSize = Math.Min(BATCH_SIZE, audioFiles.Count - i);
+                    List<string> batch = audioFiles.GetRange(i, currentBatchSize);
+
+                    _databaseManager.AddSongs(batch);
+
+                    SongsIndexed += currentBatchSize;
+                    Logger.Debug($"Indexed {SongsIndexed}/{TotalSongsToIndex} songs");
+                }
             });
         }
         catch (Exception ex)
@@ -163,6 +185,7 @@ public partial class LibraryViewModel : ViewModelBase
         }
         finally
         {
+            IsIndexing = false;
             await LoadFoldersAsync();
         }
     }
@@ -185,7 +208,7 @@ public partial class LibraryViewModel : ViewModelBase
         _audioPlayerService.Enqueue(songs);
         _audioPlayerService.PlayQueue();
     }
-    
+
     [RelayCommand]
     private void PlayPlaylistShuffled(FolderPlaylistViewModel playlist)
     {

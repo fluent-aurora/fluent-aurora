@@ -58,7 +58,7 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*" RowSpacing="10">
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
 
         <!-- Top Bar -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto, *">
@@ -68,7 +68,8 @@
                     Padding="12,6"
                     Background="{DynamicResource AccentButtonBackground}"
                     Foreground="{DynamicResource AccentButtonForeground}"
-                    CornerRadius="6">
+                    CornerRadius="6"
+                    IsEnabled="{Binding !IsIndexing}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <ic:SymbolIcon Symbol="FolderAdd" />
                     <TextBlock Text="Add Music Folder" VerticalAlignment="Center" FontWeight="SemiBold" />
@@ -76,8 +77,42 @@
             </Button>
         </Grid>
 
+        <!-- Indexing Progress -->
+        <Border Grid.Row="1"
+                IsVisible="{Binding IsIndexing}"
+                Background="#1AFFFFFF"
+                CornerRadius="8"
+                Padding="16,12"
+                Margin="0,0,0,8"
+                HorizontalAlignment="Center">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <!-- Loading Icon -->
+                <fa:ProgressRing Grid.Column="0"
+                                 Foreground="Orange"
+                                 Width="24"
+                                 Height="24"
+                                 IsIndeterminate="True"
+                                 VerticalAlignment="Center" />
+
+                <!-- Progress Text -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <TextBlock FontWeight="SemiBold" FontSize="14">
+                        <Run Text="Indexing folder: " />
+                        <Run Text="{Binding IndexingFolderName}" />
+                    </TextBlock>
+                    <TextBlock FontSize="12" Opacity="0.8">
+                        <Run Text="Added " />
+                        <Run Text="{Binding SongsIndexed}" />
+                        <Run Text=" of " />
+                        <Run Text="{Binding TotalSongsToIndex}" />
+                        <Run Text=" songs" />
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- Playlists -->
-        <ScrollViewer Grid.Row="1"
+        <ScrollViewer Grid.Row="2"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       Margin="0,8,0,0">

@@ -81,6 +81,10 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty] private int totalSongsToIndex = 0;
     [ObservableProperty] private string indexingFolderName = string.Empty;
 
+    [ObservableProperty] private bool showAllSongs = false;
+    [ObservableProperty] private ObservableCollection<AudioMetadata> allSongs = new ObservableCollection<AudioMetadata>();
+    [ObservableProperty] private bool isLoadingSongs = false;
+
     public LibraryViewModel(DatabaseManager databaseManager, StoragePickerService storagePickerService, AudioPlayerService audioPlayerService)
     {
         _databaseManager = databaseManager;
@@ -95,6 +99,48 @@ public partial class LibraryViewModel : ViewModelBase
         _storagePickerService = storagePickerService;
         _audioPlayerService = audioPlayerService;
         LoadFolders();
+    }
+    
+    partial void OnShowAllSongsChanged(bool value)
+    {
+        if (value)
+        {
+            _ = LoadAllSongsAsync();
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadAllSongsAsync()
+    {
+        try
+        {
+            IsLoadingSongs = true;
+            Logger.Info("Loading all songs from the database");
+
+            List<AudioMetadata> songs = await Task.Run(() => _databaseManager.GetAllSongs());
+
+            AllSongs.Clear();
+            foreach (AudioMetadata song in songs)
+            {
+                AllSongs.Add(song);
+            }
+
+            Logger.Info($"Loaded {AllSongs.Count} songs");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to load all songs: {ex}");
+        }
+        finally
+        {
+            IsLoadingSongs = false;
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleView()
+    {
+        ShowAllSongs = !ShowAllSongs;
     }
 
     [RelayCommand]
@@ -164,7 +210,7 @@ public partial class LibraryViewModel : ViewModelBase
                 IsIndexing = true;
                 TotalSongsToIndex = audioFiles.Count;
                 SongsIndexed = 0;
-                
+
                 // Indexing batch size to make indexing faster
                 const int BATCH_SIZE = 10;
                 for (int i = 0; i < audioFiles.Count; i += BATCH_SIZE)
@@ -188,6 +234,38 @@ public partial class LibraryViewModel : ViewModelBase
             IsIndexing = false;
             await LoadFoldersAsync();
         }
+    }
+
+    [RelayCommand]
+    private void PlayAllSongs()
+    {
+        if (AllSongs.Count == 0)
+        {
+            Logger.Warning("No songs to play");
+            return;
+        }
+
+        Logger.Info("Playing all songs");
+        _audioPlayerService.ClearQueue();
+        _audioPlayerService.Enqueue(AllSongs.ToList());
+        _audioPlayerService.PlayQueue();
+    }
+
+    [RelayCommand]
+    private void PlayAllSongsShuffled()
+    {
+        if (AllSongs.Count == 0)
+        {
+            Logger.Warning("No songs to play");
+            return;
+        }
+
+        Logger.Info("Playing all songs shuffled");
+        _audioPlayerService.IsShuffled = false;
+        _audioPlayerService.ClearQueue();
+        _audioPlayerService.Enqueue(AllSongs.ToList());
+        _audioPlayerService.ToggleShuffle();
+        _audioPlayerService.PlayQueue();
     }
 
     [RelayCommand]

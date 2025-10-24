@@ -192,7 +192,7 @@ public class DatabaseManager
         {
             // First, get all song file paths in this folder
             List<string> deletedSongPaths = GetSongPathsInFolder(connection, transaction, folderPath);
-            
+
             int songsDeleted = DeleteSongsInFolder(connection, transaction, folderPath);
             int foldersDeleted = DeleteFolderRecord(connection, transaction, folderPath);
 
@@ -218,6 +218,20 @@ public class DatabaseManager
             transaction.Rollback();
             throw;
         }
+    }
+
+    public List<AudioMetadata> GetAllSongs()
+    {
+        Logger.Info("Fetching all songs from the database...");
+
+        const string query = @"
+        SELECT s.Title, a.Name AS Artist, al.Name as Album, s.Duration, s.FilePath
+        FROM Songs s
+        LEFT JOIN Artists a ON s.ArtistId = a.Id
+        LEFT JOIN Albums al ON s.AlbumId = al.Id
+        ORDER BY s.Title COLLATE NOCASE";
+
+        return ExecuteQuery(query, reader => ReadAudioMetadata(reader));
     }
 
     private void ProcessAudioFiles(List<string> audioFiles, SqliteConnection connection, SqliteTransaction transaction, IndexingContext context)

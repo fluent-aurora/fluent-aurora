@@ -2,6 +2,7 @@
 using FluentAurora.Core.Logging;
 using CSCore;
 using CSCore.Codecs;
+using CSCore.DSP;
 using CSCore.SoundOut;
 using CSCore.Streams;
 
@@ -38,6 +39,14 @@ public sealed class AudioPlayerService : IDisposable
     private bool _isIntentionalStop;
     private bool _isDisposed;
 
+    // Visualizer spectrum
+    private SingleBlockNotificationStream? _notificationSource;
+    private readonly float[] _fftBuffer = new float[1024];
+    private readonly object _fftLock = new object();
+    private Timer? _spectrumTimer;
+    private FftProvider? _fftProvider;
+    private bool _isSpectrumEnabled = true;
+
     // Public properties
     public AudioMetadata? CurrentSong => _currentSongIndex >= 0 && _currentSongIndex < _queue.Count ? _queue[_currentSongIndex] : null;
 
@@ -67,10 +76,38 @@ public sealed class AudioPlayerService : IDisposable
         set => SetVolume(value);
     }
 
+    public bool IsSpectrumEnabled
+    {
+        get => _isSpectrumEnabled;
+        set
+        {
+            if (_isSpectrumEnabled == value)
+            {
+                return;
+            }
+
+            _isSpectrumEnabled = value;
+            Logger.Info($"Spectrum analyzer {(value ? "enabled" : "disabled")} - Playback state: {(IsPlaying ? "playing" : "not playing")}");
+
+            if (value && IsPlaying)
+            {
+                StartSpectrumTimer();
+            }
+            else if (!value)
+            {
+                StopSpectrumTimer();
+            }
+
+            SpectrumEnabledChanged?.Invoke(value);
+        }
+    }
+
     // Events
     public event Action? PlaybackStarted;
     public event Action? PlaybackPaused;
     public event Action? PlaybackStopped;
+    public event Action<float[]>? SpectrumDataAvailable;
+    public event Action<bool>? SpectrumEnabledChanged;
     public event Action<double>? PositionChanged;
     public event Action<double>? DurationChanged;
     public event Action<float>? VolumeChanged;
@@ -304,7 +341,6 @@ public sealed class AudioPlayerService : IDisposable
     }
 
     // Public: Playback controls
-
     public void ToggleShuffle()
     {
         if (_queue.Count == 0)
@@ -432,6 +468,7 @@ public sealed class AudioPlayerService : IDisposable
         IsPlaying = true;
         PlaybackStarted?.Invoke();
         StartPositionTimer();
+        StartSpectrumTimer();
     }
 
     public void Pause()
@@ -447,6 +484,7 @@ public sealed class AudioPlayerService : IDisposable
         IsPlaying = false;
         PlaybackPaused?.Invoke();
         StopPositionTimer();
+        StopSpectrumTimer();
     }
 
     public void Stop()
@@ -459,6 +497,7 @@ public sealed class AudioPlayerService : IDisposable
         _isIntentionalStop = true;
         Logger.Info("Stopping playback");
         StopPositionTimer();
+        StopSpectrumTimer();
         _soundOut?.Stop();
         ResetPosition();
         IsPlaying = false;
@@ -687,7 +726,13 @@ public sealed class AudioPlayerService : IDisposable
     {
         _waveSource = CodecFactory.Instance.GetCodec(path);
 
-        _volumeSource = new VolumeSource(_waveSource.ToSampleSource());
+        // Create notification stream for spectrum analysis & initialize FFT Provider
+        ISampleSource? sampleSource = _waveSource.ToSampleSource();
+        _notificationSource = new SingleBlockNotificationStream(sampleSource);
+        _notificationSource.SingleBlockRead += OnSingleBlockRead;
+        _fftProvider = new FftProvider(sampleSource.WaveFormat.Channels, FftSize.Fft2048);
+
+        _volumeSource = new VolumeSource(_notificationSource);
         SetVolume(_volume);
 
         _soundOut?.Initialize(_volumeSource.ToWaveSource());
@@ -696,11 +741,9 @@ public sealed class AudioPlayerService : IDisposable
         if (CurrentSong == null)
         {
             Logger.Error("Song metadata is missing");
-            // Can play, but metadata events won't trigger
         }
         else
         {
-            // Try to fill artwork from DB if missing
             CurrentSong.ArtworkData ??= DatabaseManager.GetSongArtwork(CurrentSong.FilePath!);
             MetadataLoaded?.Invoke(CurrentSong);
         }
@@ -709,6 +752,102 @@ public sealed class AudioPlayerService : IDisposable
         IsMediaReady = true;
         MediaReady?.Invoke();
         Logger.Info("Media ready");
+    }
+
+    private void OnSingleBlockRead(object? sender, SingleBlockReadEventArgs e)
+    {
+        if (_fftProvider == null)
+        {
+            return;
+        }
+        _fftProvider.Add(e.Left, e.Right);
+    }
+
+
+    private void StartSpectrumTimer()
+    {
+        if (!IsSpectrumEnabled)
+        {
+            Logger.Debug("StartSpectrumTimer: Spectrum is disabled, skipping");
+            return;
+        }
+        Logger.Info("StartSpectrumTimer: Starting spectrum analysis");
+        StopSpectrumTimer();
+        _spectrumTimer = new Timer(_ => UpdateSpectrum(), null, 0, 16); // 60 FPS (~16.67ms)
+        Logger.Debug("StartSpectrumTimer: Spectrum timer started at 60 FPS");
+    }
+
+    private void StopSpectrumTimer()
+    {
+        _spectrumTimer?.Dispose();
+        _spectrumTimer = null;
+    }
+
+    private void UpdateSpectrum()
+    {
+        if (!IsPlaying || _fftProvider == null || !IsSpectrumEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            // Fft2048 requires an array of at least 2048 elements
+            float[] fftData = new float[2048];
+
+            if (!_fftProvider.GetFftData(fftData))
+            {
+                // Normal behaviour, just silently return false
+                return;
+            }
+            // Using positive frequencies from FFT Data
+            float[] processedData = new float[64];
+
+            int usableDataLength = fftData.Length / 2;
+            int bandsPerGroup = usableDataLength / processedData.Length;
+
+            for (int i = 0; i < processedData.Length; i++)
+            {
+                float sum = 0;
+                int count = 0;
+
+                for (int j = 0; j < bandsPerGroup; j++)
+                {
+                    int index = i * bandsPerGroup + j;
+                    if (index >= usableDataLength)
+                    {
+                        continue;
+                    }
+
+                    // Squaring the value for a more dramatic response
+                    float value = fftData[index];
+                    value = value * value;
+
+                    // Frequency-based boost favouring mid to high frequencies
+                    float frequencyBoost = 1.0f + (i / (float)processedData.Length) * 4.0f;
+                    value *= frequencyBoost;
+
+                    sum += value;
+                    count++;
+                }
+
+                // Power scaling for more sensitivity
+                // Significantly amplified
+                // Logarithmic scaling for better visualization
+                float average = count > 0 ? sum / count : 0;
+                average = (float)Math.Pow(average, 0.6);
+                average *= 50.0f;
+                average = (float)Math.Log10(1 + average * 9);
+
+                processedData[i] = Math.Min(1.0f, average);
+            }
+
+            SpectrumDataAvailable?.Invoke(processedData);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Error updating spectrum: {ex}");
+        }
     }
 
     // Playback stopped handler
@@ -819,6 +958,15 @@ public sealed class AudioPlayerService : IDisposable
     {
         try
         {
+            StopSpectrumTimer();
+            if (_notificationSource != null)
+            {
+                _notificationSource.SingleBlockRead -= OnSingleBlockRead;
+                _notificationSource.Dispose();
+                _notificationSource = null;
+            }
+            _fftProvider = null;
+
             _volumeSource?.Dispose();
             _volumeSource = null;
 

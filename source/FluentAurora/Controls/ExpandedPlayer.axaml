@@ -41,33 +41,51 @@
                             Spacing="30"
                             IsVisible="{Binding !IsQueueVisible}">
                     <!-- Large Album Art with shadow -->
-                    <Border Width="400"
-                            Height="400"
-                            CornerRadius="12"
-                            HorizontalAlignment="Center"
-                            BoxShadow="0 8 32 0 #30000000"
-                            ClipToBounds="True">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                <GradientStop Color="#FF3D3D3D" Offset="0" />
-                                <GradientStop Color="#FF2D2D2D" Offset="1" />
-                            </LinearGradientBrush>
-                        </Border.Background>
-                        <Grid>
-                            <!-- Placeholder icon (No Artwork) -->
-                            <ic:SymbolIcon Symbol="MusicNote2"
-                                           FontSize="64"
-                                           Opacity="0.3"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           IsVisible="{Binding SongArtwork, Converter={x:Static ObjectConverters.IsNull}}" />
+                    <Grid HorizontalAlignment="Center"
+                          Width="400"
+                          Height="400">
+                        <!-- Ambient background visualizer -->
+                        <controls:ReactiveArtwork x:Name="AmbientVisualizer"
+                                                    SourceImage="{Binding SongArtwork}"
+                                                    IsActive="{Binding IsPlaying}">
+                            <controls:ReactiveArtwork.PlaceholderBrush>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                    <GradientStop Color="#FF3D3D3D" Offset="0" />
+                                    <GradientStop Color="#FF2D2D2D" Offset="1" />
+                                </LinearGradientBrush>
+                            </controls:ReactiveArtwork.PlaceholderBrush>
+                        </controls:ReactiveArtwork>
 
-                            <!-- Artwork -->
-                            <Image Source="{Binding SongArtwork}"
-                                   Stretch="UniformToFill"
-                                   RenderOptions.BitmapInterpolationMode="HighQuality" />
-                        </Grid>
-                    </Border>
+                        <!-- Album Art on top -->
+                        <!-- TODO: Make it switchable between visualizer and static artwork -->
+                        <Border CornerRadius="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                BoxShadow="0 8 32 0 #30000000"
+                                ClipToBounds="True"
+                                IsVisible="False">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                    <GradientStop Color="#FF3D3D3D" Offset="0" />
+                                    <GradientStop Color="#FF2D2D2D" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Grid>
+                                <!-- Placeholder icon (No Artwork) -->
+                                <ic:SymbolIcon Symbol="MusicNote2"
+                                               FontSize="64"
+                                               Opacity="0.3"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding SongArtwork, Converter={x:Static ObjectConverters.IsNull}}" />
+
+                                <!-- Artwork -->
+                                <Image Source="{Binding SongArtwork}"
+                                       Stretch="UniformToFill"
+                                       RenderOptions.BitmapInterpolationMode="HighQuality" />
+                            </Grid>
+                        </Border>
+                    </Grid>
 
                     <!-- Song Info -->
                     <StackPanel HorizontalAlignment="Center" Spacing="12" MaxWidth="500">

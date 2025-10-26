@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Runtime.CompilerServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FluentAurora.Core.Indexer;
@@ -45,7 +44,7 @@ public partial class ExpandedPlayerViewModel : CompactPlayerViewModel
         _audioPlayerService.MediaEnded += OnPlaybackChanged;
         _audioPlayerService.QueueChanged += OnQueueChanged;
         _audioPlayerService.MetadataLoaded += OnMetadataLoaded;
-        
+
         DatabaseManager.SongDeleted += filePath =>
         {
             RefreshQueueItems();

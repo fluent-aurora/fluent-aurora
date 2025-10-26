@@ -2,6 +2,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using FluentAurora.Core.Logging;
+using FluentAurora.Core.Playback;
 using FluentAurora.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,13 +13,16 @@ public partial class ExpandedPlayer : UserControl
 {
     // Properties
     private readonly ExpandedPlayerViewModel? _viewModel;
+    private readonly AudioPlayerService? _audioPlayerService;
     private bool _pointerPressed = false;
     private Point _pressedPoint;
+    private ReactiveArtwork? _reactiveArtwork;
 
     public ExpandedPlayer()
     {
         InitializeComponent();
         _viewModel = App.Services?.GetRequiredService<ExpandedPlayerViewModel>();
+        _audioPlayerService = App.Services?.GetRequiredService<AudioPlayerService>();
         DataContext = _viewModel;
 
         // Wire up seeking events
@@ -29,9 +34,90 @@ public partial class ExpandedPlayer : UserControl
             progressSlider.AddHandler(PointerReleasedEvent, OnSliderPointerReleased, handledEventsToo: true);
             progressSlider.AddHandler(PointerCaptureLostEvent, OnSliderPointerCaptureLost, handledEventsToo: true);
         }
+
+        // Wire up visualizer events
+        _reactiveArtwork = this.FindControl<ReactiveArtwork>("AmbientVisualizer");
+        if (_audioPlayerService != null)
+        {
+            _audioPlayerService.SpectrumDataAvailable += OnSpectrumDataAvailable;
+            _audioPlayerService.PlaybackStarted += OnPlaybackStarted;
+            _audioPlayerService.PlaybackStopped += OnPlaybackStopped;
+        }
     }
 
     // Events
+    private void OnSpectrumDataAvailable(float[] data)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (data == null || data.Length == 0)
+            {
+                Logger.Warning($"OnSpectrumDataAvailable: Invalid spectrum data - {(data == null ? "null" : "empty array")}");
+                return;
+            }
+
+            Logger.Trace($"OnSpectrumDataAvailable: Processing {data.Length} spectrum samples");
+
+            // Weighted average intensity
+            float totalIntensity = 0;
+            float totalWeight = 0;
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                // Favouring mid to high frequencies (Exponentially more weight goes to them)
+                float normalizedPosition = i / (float)data.Length;
+                float weight = 1.0f + (float)Math.Pow(normalizedPosition, 2) * 8.0f;
+
+                totalIntensity += data[i] * weight;
+                totalWeight += weight;
+            }
+
+            float avgIntensity = totalIntensity / totalWeight;
+            Logger.Trace($"OnSpectrumDataAvailable: Weighted average intensity: {avgIntensity:F4}");
+
+            // Squaring the intensity for more dramatic peaks
+            avgIntensity = avgIntensity * avgIntensity;
+            Logger.Trace($"OnSpectrumDataAvailable: After squaring: {avgIntensity:F4}");
+
+            // Amplifying for even bigger effect
+            float beforeAmplification = avgIntensity;
+            avgIntensity = Math.Min(1.0f, avgIntensity * 8.0f);
+
+            if (beforeAmplification * 8.0f > 1.0f)
+            {
+                Logger.Trace($"OnSpectrumDataAvailable: Intensity clamped from {beforeAmplification * 8.0f:F4} to 1.0");
+            }
+
+            Logger.Trace($"OnSpectrumDataAvailable: Final intensity: {avgIntensity:F4}");
+
+            // Updating the visualizer
+            if (_reactiveArtwork != null)
+            {
+                _reactiveArtwork.UpdateIntensity(avgIntensity);
+            }
+            else
+            {
+                Logger.Warning("OnSpectrumDataAvailable: ReactiveArtwork is null, cannot update intensity");
+            }
+        });
+    }
+
+    private void OnPlaybackStarted()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _reactiveArtwork?.Start();
+        });
+    }
+
+    private void OnPlaybackStopped()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _reactiveArtwork?.Stop();
+        });
+    }
+
     private void OnSliderPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Slider slider)

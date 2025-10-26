@@ -24,6 +24,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
     private double _clickSeekPosition = -1;
     private bool _suppressPositionUpdate = false;
     private CancellationTokenSource? _seekSuppressionCts;
+    private float _volumeBeforeMute = 100f;
 
     [ObservableProperty] private AudioMetadata? currentMetadata;
     public string SongTitle => CurrentMetadata?.DisplayTitle ?? "No Song Selected";
@@ -35,6 +36,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
     [ObservableProperty] private double displayPosition;
     [ObservableProperty] private float currentVolume;
     [ObservableProperty] private bool isPlaying;
+    [ObservableProperty] private bool isMuted;
 
     private bool _isShuffled;
     public string ShuffleIcon => _isShuffled ? "ArrowShuffle" : "ArrowShuffleOff";
@@ -50,13 +52,24 @@ public partial class CompactPlayerViewModel : ViewModelBase
         _ => "ArrowRepeatAllOff"
     };
 
-    public string VolumeIcon => CurrentVolume switch
+    public string VolumeIcon
     {
-        >= 1 and < 25 => "Speaker0",
-        >= 25 and < 66 => "Speaker1",
-        >= 66 and <= 100 => "Speaker2",
-        _ => "SpeakerMute"
-    };
+        get
+        {
+            if (IsMuted || CurrentVolume == 0)
+            {
+                return "SpeakerMute";
+            }
+
+            return CurrentVolume switch
+            {
+                >= 1 and < 25 => "Speaker0",
+                >= 25 and < 66 => "Speaker1",
+                >= 66 and <= 100 => "Speaker2",
+                _ => "SpeakerMute"
+            };
+        }
+    }
 
     // Constructor
     public CompactPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService, StoragePickerService storagePickerService)
@@ -66,6 +79,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
         _audioPlayerService = audioPlayerService;
         _isShuffled = _audioPlayerService.IsShuffled;
         CurrentVolume = _audioPlayerService.Volume;
+        IsMuted = CurrentVolume == 0;
 
         _audioPlayerService.PlaybackStarted += () =>
         {
@@ -104,6 +118,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
             Dispatcher.UIThread.Post(() =>
             {
                 CurrentVolume = volume;
+                IsMuted = volume == 0;
                 OnPropertyChanged(nameof(VolumeIcon));
             });
         };
@@ -177,7 +192,7 @@ public partial class CompactPlayerViewModel : ViewModelBase
         OnPropertyChanged(nameof(SongAlbum));
         OnPropertyChanged(nameof(SongArtwork));
     }
-    
+
     partial void OnIsPlayingChanged(bool value)
     {
         OnPropertyChanged(nameof(PlayPauseIcon));
@@ -205,6 +220,14 @@ public partial class CompactPlayerViewModel : ViewModelBase
     partial void OnCurrentVolumeChanged(float value)
     {
         OnPropertyChanged(nameof(VolumeIcon));
+        if (value == 0 && !IsMuted)
+        {
+            IsMuted = true;
+        }
+        else if (value > 0 && IsMuted)
+        {
+            IsMuted = false;
+        }
         _audioPlayerService.Volume = value;
     }
 
@@ -355,6 +378,26 @@ public partial class CompactPlayerViewModel : ViewModelBase
             catch (FileNotFoundException)
             {
             }
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleMute()
+    {
+        if (IsMuted)
+        {
+            // Restore previous volume
+            Logger.Info($"Restoring volume to ${_volumeBeforeMute}%");
+            CurrentVolume = _volumeBeforeMute > 0 ? _volumeBeforeMute : 50f; // Default to 50% if previous was 0
+            IsMuted = false;
+        }
+        else
+        {
+            // Save current volume and mute
+            Logger.Info($"Saving current volume (${_volumeBeforeMute}%) and muting");
+            _volumeBeforeMute = CurrentVolume;
+            CurrentVolume = 0;
+            IsMuted = true;
         }
     }
 }

@@ -75,7 +75,7 @@
                                 Height="32"
                                 ToolTip.Tip="Shuffle"
                                 Command="{Binding ToggleShuffleCommand}">
-                            <ic:SymbolIcon  Symbol="{Binding ShuffleIcon}" FontSize="16" />
+                            <ic:SymbolIcon Symbol="{Binding ShuffleIcon}" FontSize="16" />
                         </Button>
 
                         <!-- Previous -->
@@ -170,6 +170,7 @@
                 <Button Grid.Column="1"
                         Width="40"
                         Height="32"
+                        Command="{Binding ToggleMuteCommand}"
                         ToolTip.Tip="Mute/Unmute">
                     <ic:SymbolIcon Symbol="{Binding VolumeIcon}" FontSize="16" />
                 </Button>

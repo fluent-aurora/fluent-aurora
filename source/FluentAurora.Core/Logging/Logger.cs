@@ -9,31 +9,32 @@ namespace FluentAurora.Core.Logging;
 public static class Logger
 {
     private static readonly NLog.Logger _logger;
+    private static readonly LoggingConfiguration _config;
+    private static readonly ColoredConsoleTarget _consoleTarget;
+    private static readonly FileTarget _fileTarget;
 
     static Logger()
     {
-        LoggingConfiguration config = new LoggingConfiguration();
+        _config = new LoggingConfiguration();
+
         // Console target (colored)
-        ColoredConsoleTarget consoleTarget = new ColoredConsoleTarget("console")
+        _consoleTarget = new ColoredConsoleTarget("console")
         {
             Layout = @"[${longdate:format=HH\:mm\:ss.fff}][${level:uppercase=true:format=FirstCharacter}] ${message}"
         };
-        consoleTarget.RowHighlightingRules.Add(new ConsoleRowHighlightingRule
+        _consoleTarget.RowHighlightingRules.Add(new ConsoleRowHighlightingRule
         {
             Condition = "level == LogLevel.Warn",
             ForegroundColor = ConsoleOutputColor.Yellow
         });
-        consoleTarget.RowHighlightingRules.Add(new ConsoleRowHighlightingRule
+        _consoleTarget.RowHighlightingRules.Add(new ConsoleRowHighlightingRule
         {
             Condition = "level == LogLevel.Error",
             ForegroundColor = ConsoleOutputColor.Red
         });
 
-        config.AddTarget(consoleTarget);
-        config.AddRuleForAllLevels(consoleTarget);
-
         // File target
-        FileTarget fileTarget = new FileTarget("file")
+        _fileTarget = new FileTarget("file")
         {
             FileName = PathResolver.LogFile,
             Layout = @"[${longdate:format=HH\:mm\:ss.fff}][${level:uppercase=true:format=FirstCharacter}] ${message}",
@@ -43,11 +44,28 @@ public static class Logger
             MaxArchiveFiles = 7
         };
 
-        config.AddTarget(fileTarget);
-        config.AddRuleForAllLevels(fileTarget);
-        LogManager.Configuration = config;
+        _config.AddTarget(_consoleTarget);
+        _config.AddTarget(_fileTarget);
 
+        // Default Rules: All levels to both
+        _config.AddRule(LogLevel.Trace, LogLevel.Fatal, _consoleTarget);
+        _config.AddRule(LogLevel.Trace, LogLevel.Fatal, _fileTarget);
+
+        LogManager.Configuration = _config;
         _logger = LogManager.GetCurrentClassLogger();
+    }
+    
+    public static void SetLogLevel(LogLevel level)
+    {
+        IList<LoggingRule> rules = _config.LoggingRules;
+
+        foreach (LoggingRule rule in rules)
+        {
+            rule.SetLoggingLevels(level, LogLevel.Fatal);
+        }
+
+        LogManager.ReconfigExistingLoggers();
+        _logger.Info($"Logging level updated: {level}");
     }
 
     public static void Trace(string message) => _logger.Trace(message);

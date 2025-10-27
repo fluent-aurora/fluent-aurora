@@ -82,7 +82,10 @@ public class DatabaseManager
             "CREATE INDEX IF NOT EXISTS idx_songs_albumid ON Songs(AlbumId)",
             "CREATE INDEX IF NOT EXISTS idx_albums_artistid ON Albums(ArtistId)",
             "CREATE INDEX IF NOT EXISTS idx_artists_name ON Artists(Name)",
-            "CREATE INDEX IF NOT EXISTS idx_albums_name_artist ON Albums(Name, ArtistId)"
+            "CREATE INDEX IF NOT EXISTS idx_albums_name_artist ON Albums(Name, ArtistId)",
+            "CREATE INDEX IF NOT EXISTS idx_songs_title ON Songs(Title COLLATE NOCASE)",
+            "CREATE INDEX IF NOT EXISTS idx_artists_name_nocase ON Artists(Name COLLATE NOCASE)",
+            "CREATE INDEX IF NOT EXISTS idx_albums_name_nocase ON Albums(Name COLLATE NOCASE)"
         };
 
         ExecuteSchemaCommands(connection, indexes);
@@ -253,6 +256,61 @@ public class DatabaseManager
                 // Continue with the next file instead of failing the entire batch
             }
         }
+    }
+
+    public List<AudioMetadata> SearchSongs(string searchQuery)
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            return GetAllSongs();
+        }
+
+        Logger.Debug($"Searching songs with query: {searchQuery}");
+
+        const string query = @"
+        SELECT s.Title, a.Name AS Artist, al.Name as Album, s.Duration, s.FilePath
+        FROM Songs s
+        LEFT JOIN Artists a ON s.ArtistId = a.Id
+        LEFT JOIN Albums al ON s.AlbumId = al.Id
+        WHERE s.Title LIKE @Query COLLATE NOCASE
+           OR a.Name LIKE @Query COLLATE NOCASE
+           OR al.Name LIKE @Query COLLATE NOCASE
+        ORDER BY s.Title COLLATE NOCASE
+        LIMIT 500";
+
+        return ExecuteQuery(query, reader => ReadAudioMetadata(reader), cmd => cmd.Parameters.AddWithValue("@Query", $"%{searchQuery}%"));
+    }
+
+    public int GetSongCount(string? searchQuery = null)
+    {
+        string query;
+
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            query = "SELECT COUNT(*) FROM Songs";
+        }
+        else
+        {
+            query = @"
+            SELECT COUNT(*)
+            FROM Songs s
+            LEFT JOIN Artists a ON s.ArtistId = a.Id
+            LEFT JOIN Albums al ON s.AlbumId = al.Id
+            WHERE s.Title LIKE @Query COLLATE NOCASE
+               OR a.Name LIKE @Query COLLATE NOCASE
+               OR al.Name LIKE @Query COLLATE NOCASE";
+        }
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteCommand command = new SqliteCommand(query, connection);
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            command.Parameters.AddWithValue("@Query", $"%{searchQuery}%");
+        }
+
+        return Convert.ToInt32(command.ExecuteScalar());
     }
 
     private void ProcessSingleFile(string audioFile, SqliteConnection connection, SqliteTransaction transaction, IndexingContext context)

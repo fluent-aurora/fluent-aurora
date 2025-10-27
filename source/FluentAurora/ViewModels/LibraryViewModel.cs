@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -70,6 +71,7 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly DatabaseManager _databaseManager;
     private readonly StoragePickerService _storagePickerService;
     private readonly AudioPlayerService _audioPlayerService;
+    private CancellationTokenSource? _searchCts;
 
     public ObservableCollection<FolderPlaylistViewModel> Playlists { get; } = [];
 
@@ -82,8 +84,11 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty] private string indexingFolderName = string.Empty;
 
     [ObservableProperty] private bool showAllSongs = false;
-    [ObservableProperty] private ObservableCollection<AudioMetadata> allSongs = new ObservableCollection<AudioMetadata>();
+    [ObservableProperty] private ObservableCollection<AudioMetadata> displayedSongs = new ObservableCollection<AudioMetadata>();
     [ObservableProperty] private bool isLoadingSongs = false;
+    [ObservableProperty] private bool isSearching = false;
+    [ObservableProperty] private string searchQuery = string.Empty;
+    [ObservableProperty] private int totalSongCount = 0;
 
     public LibraryViewModel(DatabaseManager databaseManager, StoragePickerService storagePickerService, AudioPlayerService audioPlayerService)
     {
@@ -104,39 +109,81 @@ public partial class LibraryViewModel : ViewModelBase
         _audioPlayerService = audioPlayerService;
         LoadFolders();
     }
-    
+
     partial void OnShowAllSongsChanged(bool value)
     {
         if (value)
         {
-            _ = LoadAllSongsAsync();
+            _ = LoadSongsAsync();
+        }
+    }
+
+    partial void OnSearchQueryChanged(string value)
+    {
+        _ = PerformSearchAsync();
+    }
+
+    private async Task PerformSearchAsync()
+    {
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        CancellationToken token = _searchCts.Token;
+
+        try
+        {
+            int delay = SearchQuery.Length switch
+            {
+                0 => 0, // Instant (Used for clearing search)
+                1 => 300, // Single Character, too many results, the biggest delay
+                2 => 200, // 2 characters
+                _ => 125 // 3+ characters should have fast response
+            };
+            if (delay > 0)
+            {
+                await Task.Delay(delay, token);
+            }
+            await LoadSongsAsync();
+        }
+        catch (TaskCanceledException)
+        {
+            // Search cancelled, continue
         }
     }
 
     [RelayCommand]
-    private async Task LoadAllSongsAsync()
+    private void ClearSearch()
+    {
+        SearchQuery = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task LoadSongsAsync()
     {
         try
         {
-            IsLoadingSongs = true;
-            Logger.Info("Loading all songs from the database");
+            IsSearching = true;
+            Logger.Debug($"Loading songs with search query: '{SearchQuery}'");
 
-            List<AudioMetadata> songs = await Task.Run(() => _databaseManager.GetAllSongs());
+            List<AudioMetadata> songs = await Task.Run(() => _databaseManager.SearchSongs(SearchQuery));
+            int totalCount = await Task.Run(() => _databaseManager.GetSongCount(null));
 
-            AllSongs.Clear();
+            DisplayedSongs.Clear();
             foreach (AudioMetadata song in songs)
             {
-                AllSongs.Add(song);
+                DisplayedSongs.Add(song);
             }
 
-            Logger.Info($"Loaded {AllSongs.Count} songs");
+            TotalSongCount = totalCount;
+
+            Logger.Info($"Loaded {DisplayedSongs.Count} songs" + (string.IsNullOrWhiteSpace(SearchQuery) ? "" : $" (filtered from {totalCount})"));
         }
         catch (Exception ex)
         {
-            Logger.Error($"Failed to load all songs: {ex}");
+            Logger.Error($"Failed to load songs: {ex}");
         }
         finally
         {
+            IsSearching = false;
             IsLoadingSongs = false;
         }
     }
@@ -148,7 +195,7 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public async Task LoadFoldersAsync()
+    private async Task LoadFoldersAsync()
     {
         try
         {
@@ -243,7 +290,7 @@ public partial class LibraryViewModel : ViewModelBase
     [RelayCommand]
     private void PlayAllSongs()
     {
-        if (AllSongs.Count == 0)
+        if (DisplayedSongs.Count == 0)
         {
             Logger.Warning("No songs to play");
             return;
@@ -251,14 +298,14 @@ public partial class LibraryViewModel : ViewModelBase
 
         Logger.Info("Playing all songs");
         _audioPlayerService.ClearQueue();
-        _audioPlayerService.Enqueue(AllSongs.ToList());
+        _audioPlayerService.Enqueue(DisplayedSongs.ToList());
         _audioPlayerService.PlayQueue();
     }
 
     [RelayCommand]
     private void PlayAllSongsShuffled()
     {
-        if (AllSongs.Count == 0)
+        if (DisplayedSongs.Count == 0)
         {
             Logger.Warning("No songs to play");
             return;
@@ -267,7 +314,7 @@ public partial class LibraryViewModel : ViewModelBase
         Logger.Info("Playing all songs shuffled");
         _audioPlayerService.IsShuffled = false;
         _audioPlayerService.ClearQueue();
-        _audioPlayerService.Enqueue(AllSongs.ToList());
+        _audioPlayerService.Enqueue(DisplayedSongs.ToList());
         _audioPlayerService.ToggleShuffle();
         _audioPlayerService.PlayQueue();
     }
@@ -312,7 +359,7 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public void DeletePlaylist(FolderPlaylistViewModel playlist)
+    private void DeletePlaylist(FolderPlaylistViewModel playlist)
     {
         if (playlist == null)
         {
@@ -324,7 +371,7 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public async Task PlaySong(AudioMetadata song)
+    private async Task PlaySong(AudioMetadata song)
     {
         if (song == null || string.IsNullOrEmpty(song.FilePath))
         {
@@ -343,13 +390,13 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public void EnqueueSong(AudioMetadata song)
+    private void EnqueueSong(AudioMetadata song)
     {
         _audioPlayerService.Enqueue(song);
     }
 
     [RelayCommand]
-    public void RemoveSong(AudioMetadata song)
+    private void RemoveSong(AudioMetadata song)
     {
         DatabaseManager.DeleteSong(song.FilePath!);
     }

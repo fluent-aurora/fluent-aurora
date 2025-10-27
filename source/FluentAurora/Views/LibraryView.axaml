@@ -68,7 +68,8 @@
     <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
 
         <!-- Top Bar -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*"
+              IsVisible="{Binding !!Playlists.Count}">
             <Button Grid.Column="0"
                     Command="{Binding AddFolderCommand}"
                     VerticalAlignment="Center"
@@ -140,130 +141,216 @@
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled"
                           Margin="0,8,0,0">
-                <ItemsControl ItemsSource="{Binding Playlists}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <!-- Playlist Card -->
-                            <Border Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
-                                    CornerRadius="10"
-                                    Padding="14"
-                                    Margin="0,0,0,16"
-                                    BoxShadow="0 2 6 #33000000">
-                                <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
-                                    <!-- Playlist Header -->
-                                    <Expander.Header>
-                                        <DockPanel LastChildFill="False">
-                                            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="10">
-                                                <TextBlock Text="{Binding Name}" Classes="playlist-header" />
-                                                <TextBlock Text="{Binding SongCount, StringFormat='{}{0} songs'}"
-                                                           FontSize="12"
-                                                           Opacity="0.7"
-                                                           VerticalAlignment="Center" />
-                                            </StackPanel>
+                <ScrollViewer.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Opacity" Duration="0:0:0.3" />
+                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="CubicEaseOut" />
+                    </Transitions>
+                </ScrollViewer.Transitions>
+                <ScrollViewer.Styles>
+                    <Style Selector="ScrollViewer">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="RenderTransform" Value="translateY(20px)" />
+                    </Style>
+                    <Style Selector="ScrollViewer[IsVisible=true]">
+                        <Setter Property="Opacity" Value="1" />
+                        <Setter Property="RenderTransform" Value="translateY(0px)" />
+                    </Style>
+                </ScrollViewer.Styles>
+                <Grid>
+                    <!-- Empty State -->
+                    <Border IsVisible="{Binding !Playlists.Count}"
+                            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
+                            CornerRadius="12"
+                            Padding="48"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            MaxWidth="400">
+                        <StackPanel Spacing="16" HorizontalAlignment="Center">
+                            <!-- Icon -->
+                            <ic:SymbolIcon Symbol="MusicNote2"
+                                           FontSize="64"
+                                           Opacity="0.3"
+                                           HorizontalAlignment="Center" />
 
-                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-                                                <Button Command="{Binding DataContext.PlayPlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}" ToolTip.Tip="Play All">
-                                                    <ic:SymbolIcon Symbol="Play" />
-                                                </Button>
-                                                <Button Command="{Binding DataContext.PlayPlaylistShuffledCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}" ToolTip.Tip="Play All (Shuffled)">
-                                                    <ic:SymbolIcon Symbol="ArrowShuffle" />
-                                                </Button>
-                                                <Button Command="{Binding DataContext.DeletePlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}" ToolTip.Tip="Delete Playlist">
-                                                    <ic:SymbolIcon Symbol="Delete" />
-                                                </Button>
-                                            </StackPanel>
-                                        </DockPanel>
-                                    </Expander.Header>
+                            <!-- Title -->
+                            <TextBlock Text="No Music Folders"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" />
 
-                                    <!-- Songs List -->
-                                    <ItemsControl ItemsSource="{Binding Songs}" Margin="0,8,0,0">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <VirtualizingStackPanel />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
+                            <!-- Description -->
+                            <TextBlock Text="Get started by adding a folder containing your music files"
+                                       FontSize="14"
+                                       Opacity="0.7"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center" />
 
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <!-- Song Card -->
-                                                <Border Padding="8,6"
-                                                        Margin="0,2"
-                                                        CornerRadius="6"
-                                                        Background="{StaticResource SongCardBackground}"
-                                                        Classes="song-item"
-                                                        Cursor="Hand"
-                                                        Tapped="SongElement_OnTapped">
-                                                    <Border.ContextFlyout>
-                                                        <MenuFlyout>
-                                                            <MenuItem Header="Play"
-                                                                      Command="{Binding DataContext.PlaySongCommand, ElementName=LibraryRoot}"
-                                                                      CommandParameter="{Binding}">
-                                                                <MenuItem.Icon>
-                                                                    <ic:SymbolIcon Symbol="Play" />
-                                                                </MenuItem.Icon>
-                                                            </MenuItem>
-                                                            <MenuItem Header="Add to Queue"
-                                                                      Command="{Binding DataContext.EnqueueSongCommand, ElementName=LibraryRoot}"
-                                                                      CommandParameter="{Binding}">
-                                                                <MenuItem.Icon>
-                                                                    <ic:SymbolIcon Symbol="Add" />
-                                                                </MenuItem.Icon>
-                                                            </MenuItem>
-                                                            <MenuItem Header="Remove Song"
-                                                                      Command="{Binding DataContext.RemoveSongCommand, ElementName=LibraryRoot}"
-                                                                      CommandParameter="{Binding}">
-                                                                <MenuItem.Icon>
-                                                                    <ic:SymbolIcon Symbol="Delete" />
-                                                                </MenuItem.Icon>
-                                                            </MenuItem>
-                                                        </MenuFlyout>
-                                                    </Border.ContextFlyout>
+                            <!-- Action Button -->
+                            <Button Command="{Binding AddFolderCommand}"
+                                    HorizontalAlignment="Center"
+                                    Padding="16,8"
+                                    Background="{DynamicResource AccentButtonBackground}"
+                                    Foreground="{DynamicResource AccentButtonForeground}"
+                                    CornerRadius="6"
+                                    IsEnabled="{Binding !IsIndexing}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ic:SymbolIcon Symbol="FolderAdd" FontSize="18" />
+                                    <TextBlock Text="Add Music Folder"
+                                               VerticalAlignment="Center"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding Playlists}"
+                                  IsVisible="{Binding !!Playlists.Count}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <!-- Playlist Card -->
+                                <Border CornerRadius="10"
+                                        Padding="14"
+                                        Margin="0,0,0,16"
+                                        BoxShadow="0 2 6 #33000000">
+                                    <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                                        <!-- Playlist Header -->
+                                        <Expander.Header>
+                                            <DockPanel LastChildFill="False">
+                                                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="10">
+                                                    <TextBlock Text="{Binding Name}" Classes="playlist-header">
+                                                        <ToolTip.Tip>
+                                                            <TextBlock Text="{Binding Path}" />
+                                                        </ToolTip.Tip>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding SongCount, StringFormat='{}{0} songs'}"
+                                                               FontSize="12"
+                                                               Opacity="0.7"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
 
-                                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                                        <!-- Music Icon -->
-                                                        <Border Width="32" Height="32"
-                                                                CornerRadius="4"
-                                                                Background="#FF2D2D2D"
-                                                                Margin="0,0,12,0">
-                                                            <ic:SymbolIcon Symbol="MusicNote2"
-                                                                           FontSize="16"
-                                                                           Opacity="0.5"
-                                                                           HorizontalAlignment="Center"
-                                                                           VerticalAlignment="Center" />
-                                                        </Border>
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                                                    <Button Command="{Binding DataContext.PlayPlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}" ToolTip.Tip="Play All">
+                                                        <ic:SymbolIcon Symbol="Play" />
+                                                    </Button>
+                                                    <Button Command="{Binding DataContext.PlayPlaylistShuffledCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}" ToolTip.Tip="Play All (Shuffled)">
+                                                        <ic:SymbolIcon Symbol="ArrowShuffle" />
+                                                    </Button>
+                                                    <Button Command="{Binding DataContext.DeletePlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}" ToolTip.Tip="Delete Playlist">
+                                                        <ic:SymbolIcon Symbol="Delete" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Expander.Header>
 
-                                                        <!-- Title / Artist -->
-                                                        <StackPanel Grid.Column="1"
-                                                                    Orientation="Vertical"
-                                                                    VerticalAlignment="Center"
-                                                                    Margin="0,0,8,0">
-                                                            <TextBlock Text="{Binding Title}" Classes="song-title" />
-                                                            <TextBlock Text="{Binding Artist}" Classes="song-artist" />
-                                                        </StackPanel>
+                                        <!-- Songs List -->
+                                        <ItemsControl ItemsSource="{Binding Songs}" Margin="0,8,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <VirtualizingStackPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
 
-                                                        <!-- Duration -->
-                                                        <TextBlock Grid.Column="2"
-                                                                   Text="{Binding Duration, Converter={StaticResource TimeConverter}}"
-                                                                   Classes="song-duration" />
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Expander>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <!-- Song Card -->
+                                                    <Border Padding="8,6"
+                                                            Margin="0,2"
+                                                            CornerRadius="6"
+                                                            Background="{StaticResource SongCardBackground}"
+                                                            Classes="song-item"
+                                                            Cursor="Hand"
+                                                            Tapped="SongElement_OnTapped">
+                                                        <Border.ContextFlyout>
+                                                            <MenuFlyout>
+                                                                <MenuItem Header="Play"
+                                                                          Command="{Binding DataContext.PlaySongCommand, ElementName=LibraryRoot}"
+                                                                          CommandParameter="{Binding}">
+                                                                    <MenuItem.Icon>
+                                                                        <ic:SymbolIcon Symbol="Play" />
+                                                                    </MenuItem.Icon>
+                                                                </MenuItem>
+                                                                <MenuItem Header="Add to Queue"
+                                                                          Command="{Binding DataContext.EnqueueSongCommand, ElementName=LibraryRoot}"
+                                                                          CommandParameter="{Binding}">
+                                                                    <MenuItem.Icon>
+                                                                        <ic:SymbolIcon Symbol="Add" />
+                                                                    </MenuItem.Icon>
+                                                                </MenuItem>
+                                                                <MenuItem Header="Remove Song"
+                                                                          Command="{Binding DataContext.RemoveSongCommand, ElementName=LibraryRoot}"
+                                                                          CommandParameter="{Binding}">
+                                                                    <MenuItem.Icon>
+                                                                        <ic:SymbolIcon Symbol="Delete" />
+                                                                    </MenuItem.Icon>
+                                                                </MenuItem>
+                                                            </MenuFlyout>
+                                                        </Border.ContextFlyout>
+
+                                                        <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent">
+                                                            <!-- Music Icon -->
+                                                            <Border Width="32" Height="32"
+                                                                    CornerRadius="4"
+                                                                    Background="#FF2D2D2D"
+                                                                    Margin="0,0,12,0">
+                                                                <ic:SymbolIcon Symbol="MusicNote2"
+                                                                               FontSize="16"
+                                                                               Opacity="0.5"
+                                                                               HorizontalAlignment="Center"
+                                                                               VerticalAlignment="Center" />
+                                                            </Border>
+
+                                                            <!-- Title / Artist -->
+                                                            <StackPanel Grid.Column="1"
+                                                                        Orientation="Vertical"
+                                                                        VerticalAlignment="Center"
+                                                                        Margin="0,0,8,0">
+                                                                <ToolTip.Tip>
+                                                                    <TextBlock Text="{Binding FilePath}" />
+                                                                </ToolTip.Tip>
+                                                                <TextBlock Text="{Binding Title}" Classes="song-title" />
+                                                                <TextBlock Text="{Binding Artist}" Classes="song-artist" />
+                                                            </StackPanel>
+
+                                                            <!-- Duration -->
+                                                            <TextBlock Grid.Column="2"
+                                                                       Text="{Binding Duration, Converter={StaticResource TimeConverter}}"
+                                                                       Classes="song-duration" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Expander>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
             </ScrollViewer>
 
             <!-- All Songs View -->
             <Grid IsVisible="{Binding ShowAllSongs}"
                   RowDefinitions="Auto,*">
-
+                <Grid.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Opacity" Duration="0:0:0.3" />
+                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="CubicEaseOut" />
+                    </Transitions>
+                </Grid.Transitions>
+                <Grid.Styles>
+                    <Style Selector="Grid">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="RenderTransform" Value="translateY(20px)" />
+                    </Style>
+                    <Style Selector="Grid[IsVisible=true]">
+                        <Setter Property="Opacity" Value="1" />
+                        <Setter Property="RenderTransform" Value="translateY(0px)" />
+                    </Style>
+                </Grid.Styles>
                 <!-- All Songs Header -->
                 <Border Grid.Row="0"
                         Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
@@ -352,7 +439,7 @@
                                         </MenuFlyout>
                                     </Border.ContextFlyout>
 
-                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent">
                                         <!-- Music Icon -->
                                         <Border Width="32" Height="32"
                                                 CornerRadius="4"
@@ -370,6 +457,9 @@
                                                     Orientation="Vertical"
                                                     VerticalAlignment="Center"
                                                     Margin="0,0,8,0">
+                                            <ToolTip.Tip>
+                                                <TextBlock Text="{Binding FilePath}" />
+                                            </ToolTip.Tip>
                                             <TextBlock Text="{Binding Title}" Classes="song-title" />
                                             <TextBlock Text="{Binding Artist}" Classes="song-artist" />
                                         </StackPanel>

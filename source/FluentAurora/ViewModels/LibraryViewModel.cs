@@ -96,6 +96,10 @@ public partial class LibraryViewModel : ViewModelBase
         {
             LoadFolders();
         };
+        DatabaseManager.SongsAdded += () =>
+        {
+            LoadFolders();
+        };
         _storagePickerService = storagePickerService;
         _audioPlayerService = audioPlayerService;
         LoadFolders();

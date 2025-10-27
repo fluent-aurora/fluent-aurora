@@ -15,6 +15,7 @@ public class DatabaseManager
     private static readonly ArtworkCache _artworkCache = new ArtworkCache();
 
     // Events
+    public static event Action? SongsAdded;
     public static event Action<string>? SongDeleted;
     public static event Action<string>? FolderDeleted;
     public static event Action<List<string>>? SongsDeleted;
@@ -125,6 +126,10 @@ public class DatabaseManager
             Logger.Error($"Failed to add songs: {ex}");
             transaction.Rollback();
             throw;
+        }
+        finally
+        {
+            SongsAdded?.Invoke();
         }
     }
 

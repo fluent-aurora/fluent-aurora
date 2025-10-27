@@ -278,11 +278,11 @@
                             Spacing="16">
 
                     <!-- Shuffle -->
-                    <Button Width="40"
-                            Height="32"
+                    <Button Width="44"
+                            Height="44"
                             ToolTip.Tip="Shuffle"
                             Command="{Binding ToggleShuffleCommand}">
-                        <ic:SymbolIcon Symbol="{Binding ShuffleIcon}" FontSize="16" />
+                        <ic:SymbolIcon Symbol="{Binding ShuffleIcon}" FontSize="20" />
                     </Button>
 
                     <!-- Previous -->

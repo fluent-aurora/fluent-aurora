@@ -1,5 +1,7 @@
 ﻿using Avalonia;
 using System;
+using FluentAurora.Controls;
+using FluentAurora.Core.Logging;
 
 namespace FluentAurora;
 
@@ -11,7 +13,16 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.ShowError("FluentAurora - Critical Error", "The application crashed unexpectedly.", ex);
+            Logger.LogExceptionDetails(ex);
+            Environment.Exit(1);
+        }
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.

@@ -3,11 +3,12 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using FluentAurora.Core.Playback;
 using FluentAurora.Services;
-using FluentAurora.ViewModels;
 using FluentAurora.Views;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
@@ -55,11 +56,39 @@ public partial class App : Application
                 Logger.Shutdown();
             };
 
+            TaskScheduler.UnobservedTaskException += (_, args) =>
+            {
+                args.SetObserved();
+                HandleFatalException(args.Exception);
+            };
+
+            AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            {
+                if (args.ExceptionObject is Exception ex)
+                {
+                    HandleFatalException(ex);
+                }
+            };
+
+            Dispatcher.UIThread.UnhandledException += (_, args) =>
+            {
+                args.Handled = true;
+                HandleFatalException(args.Exception);
+            };
+
+
             desktop.MainWindow = mainWindow;
         }
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    private static void HandleFatalException(Exception ex)
+    {
+        Logger.Error("Exception encountered");
+        Logger.LogExceptionDetails(ex);
+    }
+
 
     private void DisableAvaloniaDataAnnotationValidation()
     {

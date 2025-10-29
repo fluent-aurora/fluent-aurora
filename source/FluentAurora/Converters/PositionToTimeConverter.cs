@@ -71,5 +71,41 @@ public class PositionToTimeConverter : IValueConverter, IMultiValueConverter
         return $"{Format(currentMs / 1000.0)} / {Format(durationMs / 1000.0)}";
     }
 
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not string s)
+        {
+            return Avalonia.Data.BindingOperations.DoNothing;
+        }
+
+        // Support values like "1:23" or "01:23:45"
+        if (TimeSpan.TryParseExact(s, new[] { @"m\:ss", @"mm\:ss", @"h\:mm\:ss", @"hh\:mm\:ss" }, culture, out TimeSpan time))
+        {
+            return time.TotalMilliseconds;
+        }
+
+        return Avalonia.Data.BindingOperations.DoNothing;
+    }
+
+    public object[] ConvertBack(IList<object?> values, Type[] targetTypes, object? parameter, CultureInfo culture)
+    {
+        if (values is null || values.Count != 1 || values[0] is not string s)
+        {
+            return [Avalonia.Data.BindingOperations.DoNothing, Avalonia.Data.BindingOperations.DoNothing];
+        }
+
+        string[] parts = s.Split('/');
+        if (parts.Length != 2)
+        {
+            return [Avalonia.Data.BindingOperations.DoNothing, Avalonia.Data.BindingOperations.DoNothing];
+        }
+
+        object ConvertPart(string text)
+        {
+            string trimmed = text.Trim();
+            return TimeSpan.TryParse(trimmed, out TimeSpan time) ? time.TotalMilliseconds : Avalonia.Data.BindingOperations.DoNothing;
+        }
+
+        return [ConvertPart(parts[0]), ConvertPart(parts[1])];
+    }
 }

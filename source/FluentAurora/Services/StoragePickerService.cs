@@ -10,6 +10,7 @@ public class StoragePickerService
 {
     // Variables
     private static IStorageProvider StorageProvider => App.MainWindow?.StorageProvider ?? throw new InvalidOperationException("StorageProvider not found");
+
     private static FilePickerOpenOptions CreateAudioFilePickerOptions(string title = "Select Audio File", bool allowMultiple = false)
     {
         return new FilePickerOpenOptions
@@ -25,6 +26,28 @@ public class StoragePickerService
             }
         };
     }
+
+    private static FilePickerOpenOptions CreateImageFilePickerOptions(string title = "Select Image File", bool allowMultiple = false)
+    {
+        return new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = allowMultiple,
+            FileTypeFilter = new List<FilePickerFileType>
+            {
+                new FilePickerFileType("Image Files")
+                {
+                    Patterns = ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp"],
+                    MimeTypes = ["image/*"]
+                },
+                new FilePickerFileType("All Files")
+                {
+                    Patterns = ["*.*"]
+                }
+            }
+        };
+    }
+
     private static FolderPickerOpenOptions CreateFolderPickerOptions(string title = "Select Folder", bool allowMultiple = false)
     {
         return new FolderPickerOpenOptions
@@ -41,6 +64,15 @@ public class StoragePickerService
     {
         string title = allowMultiple ? "Select Audio Files" : "Select Audio File";
         IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(CreateAudioFilePickerOptions(title: title, allowMultiple: allowMultiple));
+        return files.Select(f => f.Path.LocalPath).ToList();
+    }
+
+    public async Task<string?> PickImageFileAsync() => await PickImageFilesAsync(allowMultiple: false).ContinueWith(file => file.Result.FirstOrDefault());
+
+    public async Task<IReadOnlyList<string>> PickImageFilesAsync(bool allowMultiple = true)
+    {
+        string title = allowMultiple ? "Select Image Files" : "Select Image File";
+        IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(CreateImageFilePickerOptions(title: title, allowMultiple: allowMultiple));
         return files.Select(f => f.Path.LocalPath).ToList();
     }
 

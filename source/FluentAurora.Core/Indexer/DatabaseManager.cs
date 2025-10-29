@@ -85,7 +85,11 @@ public class DatabaseManager
             "CREATE INDEX IF NOT EXISTS idx_albums_name_artist ON Albums(Name, ArtistId)",
             "CREATE INDEX IF NOT EXISTS idx_songs_title ON Songs(Title COLLATE NOCASE)",
             "CREATE INDEX IF NOT EXISTS idx_artists_name_nocase ON Artists(Name COLLATE NOCASE)",
-            "CREATE INDEX IF NOT EXISTS idx_albums_name_nocase ON Albums(Name COLLATE NOCASE)"
+            "CREATE INDEX IF NOT EXISTS idx_albums_name_nocase ON Albums(Name COLLATE NOCASE)",
+            "CREATE INDEX IF NOT EXISTS idx_playlists_name ON Playlists(Name)",
+            "CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist ON PlaylistSongs(PlaylistId)",
+            "CREATE INDEX IF NOT EXISTS idx_playlist_songs_song ON PlaylistSongs(SongId)",
+            "CREATE INDEX IF NOT EXISTS idx_playlist_songs_position ON PlaylistSongs(PlaylistId, Position)"
         };
 
         ExecuteSchemaCommands(connection, indexes);
@@ -493,6 +497,374 @@ public class DatabaseManager
 
     public static void ClearArtworkCache() => _artworkCache.Clear();
 
+    // Playlist Management
+    public static long CreatePlaylist(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Playlist name cannot be empty", nameof(name));
+        }
+
+        Logger.Info($"Creating playlist: {name}");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        try
+        {
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+            using SqliteCommand command = new SqliteCommand(
+                @"INSERT INTO Playlists (Name, CreatedAt, UpdatedAt) 
+              VALUES (@Name, @CreatedAt, @UpdatedAt);
+              SELECT last_insert_rowid();", connection, transaction);
+
+            command.Parameters.AddWithValue("@Name", name);
+            command.Parameters.AddWithValue("@CreatedAt", now);
+            command.Parameters.AddWithValue("@UpdatedAt", now);
+
+            long playlistId = (long)command.ExecuteScalar()!;
+
+            transaction.Commit();
+            Logger.Info($"Created playlist '{name}' with ID {playlistId}");
+            return playlistId;
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
+        {
+            // UNIQUE constraint failed (Playlist with that name already exists)
+            Logger.Error($"Failed to create playlist '{name}': Playlist name already exists");
+            transaction.Rollback();
+            throw; // Throw again to be caught by PlaylistDialogService
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to create playlist '{name}': {ex.Message}");
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    public static void RenamePlaylist(long playlistId, string newName)
+    {
+        Logger.Info($"Renaming playlist {playlistId} to '{newName}'");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteCommand command = new SqliteCommand(
+            @"UPDATE Playlists 
+          SET Name = @Name, UpdatedAt = @UpdatedAt 
+          WHERE Id = @Id", connection);
+
+        command.Parameters.AddWithValue("@Id", playlistId);
+        command.Parameters.AddWithValue("@Name", newName);
+        command.Parameters.AddWithValue("@UpdatedAt", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+        int rowsAffected = command.ExecuteNonQuery();
+
+        if (rowsAffected > 0)
+        {
+            Logger.Info($"Renamed playlist to '{newName}'");
+        }
+        else
+        {
+            Logger.Warning($"No playlist found with ID: {playlistId}");
+        }
+    }
+
+    public static void DeletePlaylist(long playlistId)
+    {
+        Logger.Info($"Deleting playlist {playlistId}");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteCommand command = new SqliteCommand(
+            "DELETE FROM Playlists WHERE Id = @Id", connection);
+
+        command.Parameters.AddWithValue("@Id", playlistId);
+
+        int rowsAffected = command.ExecuteNonQuery();
+
+        if (rowsAffected > 0)
+        {
+            Logger.Info($"Deleted playlist {playlistId}");
+        }
+        else
+        {
+            Logger.Warning($"No playlist found with ID: {playlistId}");
+        }
+    }
+
+    public static void AddSongToPlaylist(long playlistId, string songFilePath)
+    {
+        Logger.Info($"Adding song to playlist {playlistId}: {songFilePath}");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        try
+        {
+            // Get song ID
+            long? songId = GetSongIdByPath(connection, transaction, songFilePath);
+
+            if (songId == null)
+            {
+                Logger.Warning($"Song not found: {songFilePath}");
+                return;
+            }
+
+            // Get next position
+            int position = GetNextPlaylistPosition(connection, transaction, playlistId);
+
+            // Add to playlist
+            using SqliteCommand command = new SqliteCommand(
+                @"INSERT OR IGNORE INTO PlaylistSongs (PlaylistId, SongId, Position, AddedAt) 
+              VALUES (@PlaylistId, @SongId, @Position, @AddedAt)", connection, transaction);
+
+            command.Parameters.AddWithValue("@PlaylistId", playlistId);
+            command.Parameters.AddWithValue("@SongId", songId.Value);
+            command.Parameters.AddWithValue("@Position", position);
+            command.Parameters.AddWithValue("@AddedAt", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+            command.ExecuteNonQuery();
+
+            // Update playlist timestamp
+            UpdatePlaylistTimestamp(connection, transaction, playlistId);
+
+            transaction.Commit();
+            Logger.Info($"Added song to playlist");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to add song to playlist: {ex.Message}");
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    public static void RemoveSongFromPlaylist(long playlistId, string songFilePath)
+    {
+        Logger.Info($"Removing song from playlist {playlistId}: {songFilePath}");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        try
+        {
+            // Get song ID
+            long? songId = GetSongIdByPath(connection, transaction, songFilePath);
+
+            if (songId == null)
+            {
+                Logger.Warning($"Song not found: {songFilePath}");
+                return;
+            }
+
+            using SqliteCommand command = new SqliteCommand(
+                @"DELETE FROM PlaylistSongs 
+              WHERE PlaylistId = @PlaylistId AND SongId = @SongId", connection, transaction);
+
+            command.Parameters.AddWithValue("@PlaylistId", playlistId);
+            command.Parameters.AddWithValue("@SongId", songId.Value);
+
+            command.ExecuteNonQuery();
+
+            // Update playlist timestamp
+            UpdatePlaylistTimestamp(connection, transaction, playlistId);
+
+            transaction.Commit();
+            Logger.Info($"Removed song from playlist");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to remove song from playlist: {ex.Message}");
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    public List<PlaylistRecord> GetAllPlaylists()
+    {
+        Logger.Info("Fetching all playlists from the database...");
+
+        const string query = @"
+    SELECT p.Id, p.Name, p.CustomArtwork, p.CreatedAt, p.UpdatedAt,
+           COUNT(ps.Id) as SongCount,
+           SUM(s.Duration) as TotalDuration
+    FROM Playlists p
+    LEFT JOIN PlaylistSongs ps ON p.Id = ps.PlaylistId
+    LEFT JOIN Songs s ON ps.SongId = s.Id
+    GROUP BY p.Id, p.Name, p.CustomArtwork, p.CreatedAt, p.UpdatedAt
+    ORDER BY p.UpdatedAt DESC";
+
+        return ExecuteQuery(query, reader => new PlaylistRecord
+        {
+            Id = reader.GetInt64(0),
+            Name = reader.GetString(1),
+            CustomArtwork = reader.IsDBNull(2) ? null : (byte[])reader.GetValue(2),
+            CreatedAt = DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(3)).DateTime,
+            UpdatedAt = DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(4)).DateTime,
+            SongCount = reader.GetInt32(5),
+            TotalDuration = reader.IsDBNull(6) ? null : reader.GetDouble(6)
+        });
+    }
+
+    public static double? GetPlaylistTotalDuration(long playlistId)
+    {
+        const string query = @"
+    SELECT SUM(s.Duration) as TotalDuration
+    FROM PlaylistSongs ps
+    INNER JOIN Songs s ON ps.SongId = s.Id
+    WHERE ps.PlaylistId = @PlaylistId";
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteCommand command = new SqliteCommand(query, connection);
+        command.Parameters.AddWithValue("@PlaylistId", playlistId);
+
+        object? result = command.ExecuteScalar();
+        return result == DBNull.Value || result == null ? null : Convert.ToDouble(result);
+    }
+
+    public static void UpdatePlaylistSongPositions(long playlistId, List<string> songFilePathsInOrder)
+    {
+        Logger.Info($"Updating song positions for playlist {playlistId}");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        try
+        {
+            for (int i = 0; i < songFilePathsInOrder.Count; i++)
+            {
+                string filePath = songFilePathsInOrder[i];
+
+                // Get song ID
+                long? songId = GetSongIdByPath(connection, transaction, filePath);
+                if (songId == null) continue;
+
+                // Update position
+                using SqliteCommand command = new SqliteCommand(
+                    @"UPDATE PlaylistSongs 
+                  SET Position = @Position 
+                  WHERE PlaylistId = @PlaylistId AND SongId = @SongId",
+                    connection, transaction);
+
+                command.Parameters.AddWithValue("@Position", i);
+                command.Parameters.AddWithValue("@PlaylistId", playlistId);
+                command.Parameters.AddWithValue("@SongId", songId.Value);
+
+                command.ExecuteNonQuery();
+            }
+
+            // Update playlist timestamp
+            UpdatePlaylistTimestamp(connection, transaction, playlistId);
+
+            transaction.Commit();
+            Logger.Info($"Updated positions for {songFilePathsInOrder.Count} songs");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to update song positions: {ex.Message}");
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    public List<AudioMetadata> GetPlaylistSongs(long playlistId)
+    {
+        Logger.Info($"Fetching songs for playlist {playlistId}");
+
+        const string query = @"
+        SELECT s.Title, a.Name AS Artist, al.Name as Album, s.Duration, s.FilePath
+        FROM PlaylistSongs ps
+        INNER JOIN Songs s ON ps.SongId = s.Id
+        LEFT JOIN Artists a ON s.ArtistId = a.Id
+        LEFT JOIN Albums al ON s.AlbumId = al.Id
+        WHERE ps.PlaylistId = @PlaylistId
+        ORDER BY ps.Position";
+
+        return ExecuteQuery(query, reader => ReadAudioMetadata(reader),
+            cmd => cmd.Parameters.AddWithValue("@PlaylistId", playlistId));
+    }
+
+    public static byte[]? GetPlaylistArtwork(long playlistId)
+    {
+        const string query = @"
+    SELECT COALESCE(s.Artwork, al.Artwork) AS Artwork
+    FROM PlaylistSongs ps
+    INNER JOIN Songs s ON ps.SongId = s.Id
+    LEFT JOIN Albums al ON s.AlbumId = al.Id
+    WHERE ps.PlaylistId = @PlaylistId
+    ORDER BY ps.Position
+    LIMIT 1";
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteCommand command = new SqliteCommand(query, connection);
+        command.Parameters.AddWithValue("@PlaylistId", playlistId);
+
+        using SqliteDataReader reader = command.ExecuteReader();
+        if (reader.Read())
+        {
+            return reader.IsDBNull(0) ? null : (byte[])reader.GetValue(0);
+        }
+
+        return null;
+    }
+
+    public static void UpdatePlaylistArtwork(long playlistId, byte[]? artworkData)
+    {
+        Logger.Info($"Updating artwork for playlist {playlistId}");
+
+        using SqliteConnection connection = CreateConnection();
+        connection.Open();
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        try
+        {
+            using SqliteCommand command = new SqliteCommand(
+                @"UPDATE Playlists 
+              SET CustomArtwork = @Artwork, UpdatedAt = @UpdatedAt 
+              WHERE Id = @Id", connection, transaction);
+
+            command.Parameters.AddWithValue("@Id", playlistId);
+            command.Parameters.AddWithValue("@Artwork", (object?)artworkData ?? DBNull.Value);
+            command.Parameters.AddWithValue("@UpdatedAt", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+            int rowsAffected = command.ExecuteNonQuery();
+
+            transaction.Commit();
+
+            if (rowsAffected > 0)
+            {
+                Logger.Info($"Updated artwork for playlist {playlistId}");
+            }
+            else
+            {
+                Logger.Warning($"No playlist found with ID: {playlistId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to update playlist artwork: {ex.Message}");
+            transaction.Rollback();
+            throw;
+        }
+    }
+
     // Helpers
     private static SqliteConnection CreateConnection() => new SqliteConnection(ConnectionString);
 
@@ -588,6 +960,40 @@ public class DatabaseManager
         command.Parameters.AddWithValue("@FolderPath", folderPath);
 
         return command.ExecuteNonQuery();
+    }
+
+    private static long? GetSongIdByPath(SqliteConnection connection, SqliteTransaction transaction, string filePath)
+    {
+        using SqliteCommand command = new SqliteCommand(
+            "SELECT Id FROM Songs WHERE FilePath = @FilePath", connection, transaction);
+
+        command.Parameters.AddWithValue("@FilePath", filePath);
+
+        object? result = command.ExecuteScalar();
+        return result as long?;
+    }
+
+    private static int GetNextPlaylistPosition(SqliteConnection connection, SqliteTransaction transaction, long playlistId)
+    {
+        using SqliteCommand command = new SqliteCommand(
+            "SELECT COALESCE(MAX(Position), -1) + 1 FROM PlaylistSongs WHERE PlaylistId = @PlaylistId",
+            connection, transaction);
+
+        command.Parameters.AddWithValue("@PlaylistId", playlistId);
+
+        return Convert.ToInt32(command.ExecuteScalar());
+    }
+
+    private static void UpdatePlaylistTimestamp(SqliteConnection connection, SqliteTransaction transaction, long playlistId)
+    {
+        using SqliteCommand command = new SqliteCommand(
+            "UPDATE Playlists SET UpdatedAt = @UpdatedAt WHERE Id = @Id",
+            connection, transaction);
+
+        command.Parameters.AddWithValue("@Id", playlistId);
+        command.Parameters.AddWithValue("@UpdatedAt", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+        command.ExecuteNonQuery();
     }
 
     // Indexing Context Class

@@ -1,4 +1,5 @@
 ﻿using System;
+using Avalonia.Controls;
 using FluentAurora.Controls;
 using FluentAurora.Core.Indexer;
 using FluentAurora.Core.Playback;
@@ -35,6 +36,12 @@ public static class ServiceConfigurator
         services.AddSingleton<DatabaseManager>();
         services.AddSingleton<PlaybackControlService>();
         services.AddSingleton<StoragePickerService>();
+        services.AddSingleton<PlaylistDialogService>(provider =>
+        {
+            DatabaseManager dbManager = provider.GetRequiredService<DatabaseManager>();
+            Window mainWindow = provider.GetRequiredService<MainWindow>();
+            return new PlaylistDialogService(dbManager, mainWindow);
+        });
 
         return services.BuildServiceProvider();
     }

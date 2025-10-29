@@ -16,13 +16,19 @@ public partial class LibraryView : UserControl
 
     private void SongElement_OnTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is not Border { DataContext: AudioMetadata song })
+        if (sender is not Border border || DataContext is not LibraryViewModel vm)
         {
             return;
         }
+
+        vm.PlaySongCommand.Execute(border.DataContext);
+    }
+
+    private void CloseOverlay_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
         if (DataContext is LibraryViewModel vm)
         {
-            vm.PlaySongCommand.Execute(song);
+            vm.ClosePlaylistDetailsCommand.Execute(null);
         }
     }
 }

@@ -69,7 +69,7 @@
 
         <!-- Top Bar -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*"
-              IsVisible="{Binding !!Playlists.Count}">
+              IsVisible="{Binding !!Folders.Count}">
             <Button Grid.Column="0"
                     Command="{Binding AddFolderCommand}"
                     VerticalAlignment="Center"
@@ -159,7 +159,7 @@
                 </ScrollViewer.Styles>
                 <Grid>
                     <!-- Empty State -->
-                    <Border IsVisible="{Binding !Playlists.Count}"
+                    <Border IsVisible="{Binding !Folders.Count}"
                             Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
                             CornerRadius="12"
                             Padding="48"
@@ -204,8 +204,8 @@
                             </Button>
                         </StackPanel>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Playlists}"
-                                  IsVisible="{Binding !!Playlists.Count}">
+                    <ItemsControl ItemsSource="{Binding Folders}"
+                                  IsVisible="{Binding !!Folders.Count}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <!-- Playlist Card -->
@@ -230,15 +230,15 @@
                                                 </StackPanel>
 
                                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-                                                    <Button Command="{Binding DataContext.PlayPlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    <Button Command="{Binding DataContext.PlayFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}" ToolTip.Tip="Play All">
                                                         <ic:SymbolIcon Symbol="Play" />
                                                     </Button>
-                                                    <Button Command="{Binding DataContext.PlayPlaylistShuffledCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    <Button Command="{Binding DataContext.PlayFolderShuffledCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}" ToolTip.Tip="Play All (Shuffled)">
                                                         <ic:SymbolIcon Symbol="ArrowShuffle" />
                                                     </Button>
-                                                    <Button Command="{Binding DataContext.DeletePlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    <Button Command="{Binding DataContext.DeleteFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}" ToolTip.Tip="Delete Playlist">
                                                         <ic:SymbolIcon Symbol="Delete" />
                                                     </Button>

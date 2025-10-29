@@ -14,58 +14,6 @@ using FluentAurora.Services;
 
 namespace FluentAurora.ViewModels;
 
-public partial class FolderPlaylistViewModel : ObservableObject
-{
-    private readonly DatabaseManager _databaseManager;
-    private ObservableCollection<AudioMetadata>? _songs;
-    private bool _isLoaded;
-
-    public string Name { get; set; } = string.Empty;
-    public string Path { get; set; } = string.Empty;
-
-    [ObservableProperty] private bool isExpanded;
-
-    public ObservableCollection<AudioMetadata> Songs
-    {
-        get
-        {
-            if (!_isLoaded && IsExpanded)
-            {
-                LoadSongs();
-            }
-            return _songs ??= new ObservableCollection<AudioMetadata>();
-        }
-    }
-
-    [ObservableProperty] private int songCount;
-
-    public FolderPlaylistViewModel(DatabaseManager databaseManager)
-    {
-        _databaseManager = databaseManager;
-    }
-
-    partial void OnIsExpandedChanged(bool value)
-    {
-        if (value && !_isLoaded)
-        {
-            LoadSongs();
-        }
-    }
-
-    private void LoadSongs()
-    {
-        if (_isLoaded)
-        {
-            return;
-        }
-
-        List<AudioMetadata> songs = _databaseManager.GetSongsFolder(Path);
-        _songs = new ObservableCollection<AudioMetadata>(songs);
-        _isLoaded = true;
-        OnPropertyChanged(nameof(Songs));
-    }
-}
-
 public partial class LibraryViewModel : ViewModelBase
 {
     private readonly DatabaseManager _databaseManager;
@@ -73,9 +21,8 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly AudioPlayerService _audioPlayerService;
     private CancellationTokenSource? _searchCts;
 
-    public ObservableCollection<FolderPlaylistViewModel> Playlists { get; } = [];
-
-    [ObservableProperty] private FolderPlaylistViewModel? selectedPlaylist;
+    public ObservableCollection<FolderPlaylistViewModel> Folders { get; } = [];
+    [ObservableProperty] private FolderPlaylistViewModel? selectedFolder;
 
     // Indexing progress properties
     [ObservableProperty] private bool isIndexing = false;
@@ -201,14 +148,14 @@ public partial class LibraryViewModel : ViewModelBase
         {
             Logger.Info("Loading folders from the database...");
 
-            Playlists.Clear();
+            Folders.Clear();
 
             // Load folders with song count only, not the actual songs
             List<FolderRecord> folders = await Task.Run(() => _databaseManager.GetAllFolders());
 
             foreach (FolderRecord folder in folders)
             {
-                FolderPlaylistViewModel playlistVm = new FolderPlaylistViewModel(_databaseManager)
+                FolderPlaylistViewModel folderVm = new FolderPlaylistViewModel(_databaseManager)
                 {
                     Name = folder.Name,
                     Path = folder.Path,
@@ -216,10 +163,10 @@ public partial class LibraryViewModel : ViewModelBase
                     IsExpanded = false
                 };
 
-                Playlists.Add(playlistVm);
+                Folders.Add(folderVm);
             }
 
-            Logger.Info($"Loaded {Playlists.Count} folders");
+            Logger.Info($"Loaded {Folders.Count} folders");
         }
         catch (Exception ex)
         {
@@ -320,54 +267,54 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public void PlayPlaylist(FolderPlaylistViewModel playlist)
+    private void PlayFolder(FolderPlaylistViewModel folder)
     {
-        if (playlist == null)
+        if (folder == null)
         {
-            Logger.Warning("Playlist is null");
+            Logger.Warning("Folder is null");
             return;
         }
 
-        Logger.Info($"Queueing playlist: {playlist.Name}");
+        Logger.Info($"Queueing Folder: {folder.Name}");
 
         _audioPlayerService.ClearQueue();
 
         // Load songs without artwork for playback
-        List<AudioMetadata> songs = _databaseManager.GetSongsFolder(playlist.Path);
+        List<AudioMetadata> songs = _databaseManager.GetSongsFolder(folder.Path);
         _audioPlayerService.Enqueue(songs);
         _audioPlayerService.PlayQueue();
     }
 
     [RelayCommand]
-    private void PlayPlaylistShuffled(FolderPlaylistViewModel playlist)
+    private void PlayFolderShuffled(FolderPlaylistViewModel folder)
     {
-        if (playlist == null)
+        if (folder == null)
         {
-            Logger.Warning("Playlist is null");
+            Logger.Warning("Folder is null");
             return;
         }
 
-        Logger.Info($"Queueing playlist: {playlist.Name}");
+        Logger.Info($"Queueing Folder: {folder.Name} (Shuffled)");
         _audioPlayerService.IsShuffled = false; // Reset shuffle state
         _audioPlayerService.ClearQueue();
 
         // Load songs without artwork for playback
-        List<AudioMetadata> songs = _databaseManager.GetSongsFolder(playlist.Path);
+        List<AudioMetadata> songs = _databaseManager.GetSongsFolder(folder.Path);
         _audioPlayerService.Enqueue(songs);
         _audioPlayerService.ToggleShuffle();
         _audioPlayerService.PlayQueue();
     }
 
     [RelayCommand]
-    private void DeletePlaylist(FolderPlaylistViewModel playlist)
+    private void DeleteFolder(FolderPlaylistViewModel folder)
     {
-        if (playlist == null)
+        if (folder == null)
         {
-            Logger.Warning("Playlist is null");
+            Logger.Warning("Folder is null");
             return;
         }
-        Logger.Info($"Deleting playlist: {playlist.Name}");
-        DatabaseManager.DeleteFolder(playlist.Path);
+        Logger.Info($"Deleting folder: {folder.Name}");
+        DatabaseManager.DeleteFolder(folder.Path);
     }
 
     [RelayCommand]

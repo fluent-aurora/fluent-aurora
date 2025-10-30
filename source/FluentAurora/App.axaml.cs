@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using FluentAurora.Core.Playback;
+using FluentAurora.Core.Settings;
 using FluentAurora.Services;
 using FluentAurora.Views;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,6 +37,7 @@ public partial class App : Application
             Services = ServiceConfigurator.ConfigureServices();
 
             MainWindow mainWindow = Services.GetRequiredService<MainWindow>();
+            ISettingsManager settingsManager = Services.GetRequiredService<ISettingsManager>();
 
             mainWindow.Opened += (_, _) =>
             {
@@ -54,6 +56,8 @@ public partial class App : Application
             desktop.Exit += (_, _) =>
             {
                 Logger.Shutdown();
+                settingsManager.SaveAll();
+                settingsManager.Dispose();
             };
 
             TaskScheduler.UnobservedTaskException += (_, args) =>

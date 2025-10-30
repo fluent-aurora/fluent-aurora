@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using FluentAurora.Controls;
 using FluentAurora.Core.Indexer;
 using FluentAurora.Core.Playback;
+using FluentAurora.Core.Settings;
 using FluentAurora.ViewModels;
 using FluentAurora.Views;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,8 @@ public static class ServiceConfigurator
 
         // Core
         services.AddSingleton<AudioPlayerService>(); // Audio Player
+        services.AddSingleton<IApplicationSettings, ApplicationSettings>();
+        services.AddSingleton<ISettingsManager, SettingsManager>();
 
         // Controls
         services.AddTransient<CompactPlayer>();

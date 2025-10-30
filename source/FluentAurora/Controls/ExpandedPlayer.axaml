@@ -46,8 +46,10 @@
                           Height="400">
                         <!-- Ambient background visualizer -->
                         <controls:ReactiveArtwork x:Name="AmbientVisualizer"
-                                                    SourceImage="{Binding SongArtwork}"
-                                                    IsActive="{Binding IsPlaying}">
+                                                  SourceImage="{Binding SongArtwork}"
+                                                  IsActive="{Binding IsReactiveArtworkEnabled}"
+                                                  BaseScale="{Binding ReactiveArtworkBaseScale}"
+                                                  MaxScale="{Binding ReactiveArtworkMaxScale}">
                             <controls:ReactiveArtwork.PlaceholderBrush>
                                 <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                                     <GradientStop Color="#FF3D3D3D" Offset="0" />

@@ -5,6 +5,7 @@ using CSCore.Codecs;
 using CSCore.DSP;
 using CSCore.SoundOut;
 using CSCore.Streams;
+using FluentAurora.Core.Settings;
 
 namespace FluentAurora.Core.Playback;
 
@@ -17,6 +18,9 @@ public sealed class AudioPlayerService : IDisposable
     private const float VOLUME_SOFT_CURVE_FACTOR = 0.6f;
     private const float VOLUME_FAST_CURVE_BASE = 0.3f;
     private const float VOLUME_FAST_CURVE_FACTOR = 1.4f;
+
+    // Settings
+    private readonly ISettingsManager? _settingsManager;
 
     // Queue storage
     private readonly List<AudioMetadata> _queue = new List<AudioMetadata>();
@@ -119,17 +123,34 @@ public sealed class AudioPlayerService : IDisposable
     public event Action? QueueChanged;
 
     // Constructor
-    public AudioPlayerService()
+    public AudioPlayerService(ISettingsManager settingsManager)
     {
         Logger.Info("Initializing AudioPlayerService (CSCore)");
         InitializeSoundOut();
         Logger.Info("AudioPlayerService initialized successfully");
+
+        _settingsManager = settingsManager;
+        LoadSettings();
 
         DatabaseManager.SongDeleted += OnSongDeleted;
         DatabaseManager.SongsDeleted += OnSongsDeleted;
     }
 
     // Methods
+    private void LoadSettings()
+    {
+        if (_settingsManager == null)
+        {
+            Logger.Warning("Settings Manager not initialized");
+            return;
+        }
+        
+        // Stored as 0-1 (float)
+        float savedVolume = _settingsManager.Application.Playback.Volume * 100f;
+        _volume = Math.Clamp(savedVolume, 0f, 100f);
+        Logger.Info($"Loaded volume from settings: {_volume}%");
+    }
+
     // Public: Queue management
     public void Enqueue(AudioMetadata song)
     {
@@ -592,6 +613,11 @@ public sealed class AudioPlayerService : IDisposable
 
         Logger.Info($"Volume set to {_volume}% (Adjusted: {adjustedVolume * 100}%)");
         VolumeChanged?.Invoke(_volume);
+        
+        if (_settingsManager != null)
+        {
+            _settingsManager.Application.Playback.Volume = _volume / 100f;
+        }
     }
 
     private static float CalculateAdjustedVolume(float volume)
@@ -993,6 +1019,13 @@ public sealed class AudioPlayerService : IDisposable
 
         try
         {
+            if (_settingsManager != null)
+            {
+                _settingsManager.Application.Playback.Volume = _volume / 100f;
+                _settingsManager.SaveAll();
+                Logger.Debug("Saved volume to settings");
+            }
+
             StopPositionTimer();
             _soundOut?.Stop();
             _soundOut?.Dispose();

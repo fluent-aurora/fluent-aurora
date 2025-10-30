@@ -29,6 +29,7 @@ public static class ServiceConfigurator
 
         // Views
         services.AddSingleton<LibraryViewModel>();
+        services.AddSingleton<SettingsViewModel>();
 
         // Windows
         services.AddSingleton<MainWindow>();

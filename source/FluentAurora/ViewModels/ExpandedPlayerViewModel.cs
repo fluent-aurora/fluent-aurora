@@ -1,9 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FluentAurora.Core.Indexer;
 using FluentAurora.Core.Playback;
+using FluentAurora.Core.Settings;
 using FluentAurora.Services;
 
 namespace FluentAurora.ViewModels;
@@ -30,13 +32,25 @@ public partial class ExpandedPlayerViewModel : CompactPlayerViewModel
     }
 
     private readonly AudioPlayerService _audioPlayerService;
+    private readonly ISettingsManager _settingsManager;
     [ObservableProperty] private bool isQueueVisible = false;
     [ObservableProperty] private int currentSongIndex;
     [ObservableProperty] private ObservableCollection<QueueItemViewModel> queueItems = [];
+    [ObservableProperty] private bool isReactiveArtworkEnabled;
+    [ObservableProperty] private double reactiveArtworkBaseScale;
+    [ObservableProperty] private double reactiveArtworkMaxScale;
 
     // Constructors
-    public ExpandedPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService, StoragePickerService storagePickerService) : base(audioPlayerService, playbackControlService, storagePickerService)
+    public ExpandedPlayerViewModel(AudioPlayerService audioPlayerService, PlaybackControlService playbackControlService, StoragePickerService storagePickerService, ISettingsManager settingsManager) : base(audioPlayerService,
+        playbackControlService, storagePickerService)
     {
+        _settingsManager = settingsManager;
+        _settingsManager.ApplicationSettingsChanged += (_, _) =>
+        {
+            Dispatcher.UIThread.Post(LoadSettingsValues);
+        };
+        LoadSettingsValues();
+
         _audioPlayerService = audioPlayerService;
         RefreshQueueItems();
         _audioPlayerService.PlaybackStarted += OnPlaybackChanged;
@@ -52,6 +66,14 @@ public partial class ExpandedPlayerViewModel : CompactPlayerViewModel
     }
 
     // Methods
+    private void LoadSettingsValues()
+    {
+        ApplicationSettingsStore settings = _settingsManager.Application;
+        IsReactiveArtworkEnabled = settings.Playback.ReactiveArtwork.Enabled;
+        ReactiveArtworkBaseScale = settings.Playback.ReactiveArtwork.Scale.Base;
+        ReactiveArtworkMaxScale = settings.Playback.ReactiveArtwork.Scale.Max;
+    }
+
     private void RefreshQueueItems()
     {
         ObservableCollection<QueueItemViewModel> items = new ObservableCollection<QueueItemViewModel>();

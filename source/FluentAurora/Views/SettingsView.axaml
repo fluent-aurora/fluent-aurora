@@ -2,7 +2,140 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             xmlns:ic="using:FluentIcons.Avalonia.Fluent"
+             xmlns:vm="using:FluentAurora.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="FluentAurora.Views.SettingsView">
-    Welcome to Avalonia!
+             x:Class="FluentAurora.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <ScrollViewer>
+        <StackPanel Spacing="12" Margin="20">
+            <fa:SettingsExpander Header="Player"
+                                 Description="Customize player appearance and behavior">
+                <fa:SettingsExpander.IconSource>
+                    <ic:SymbolIconSource Symbol="PlaySettings" />
+                </fa:SettingsExpander.IconSource>
+                <fa:SettingsExpander.Items>
+                    <!-- Reactive Artwork Section -->
+                    <fa:SettingsExpander Header="Reactive Artwork"
+                                         HorizontalAlignment="Stretch"
+                                         Description="Makes the artwork move in the rhythm of the song">
+                        <fa:SettingsExpander.IconSource>
+                            <ic:SymbolIconSource Symbol="WindowSettings" />
+                        </fa:SettingsExpander.IconSource>
+                        <fa:SettingsExpander.Footer>
+                            <ToggleSwitch IsChecked="{Binding ReactiveArtworkEnabled}" />
+                        </fa:SettingsExpander.Footer>
+                        <fa:SettingsExpander.Items>
+                            <StackPanel>
+                                <!-- Base Scale Only -->
+                                <fa:SettingsExpander Header="Base Scale"
+                                                     HorizontalAlignment="Stretch"
+                                                     Description="Set the base scale for the artwork"
+                                                     IsVisible="{Binding !ReactiveArtworkEnabled}">
+                                    <fa:SettingsExpander.IconSource>
+                                        <ic:SymbolIconSource Symbol="ResizeVideo" />
+                                    </fa:SettingsExpander.IconSource>
+                                    <fa:SettingsExpander.Footer>
+                                        <TextBlock VerticalAlignment="Center">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="{}{0:F0}%">
+                                                    <Binding Path="ArtworkScaleRangeStart" />
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </fa:SettingsExpander.Footer>
+                                    <fa:SettingsExpander.Items>
+                                        <StackPanel Margin="48,10,10,10">
+                                            <Grid ColumnDefinitions="Auto,*,50">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="Scale:"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,10,0" />
+                                                <Slider Grid.Column="1"
+                                                        Minimum="0"
+                                                        Maximum="400"
+                                                        Value="{Binding ArtworkScaleRangeStart}"
+                                                        TickFrequency="1"
+                                                        Margin="10,0" />
+                                                <TextBlock Grid.Column="2"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Right">
+                                                    <TextBlock.Text>
+                                                        <MultiBinding StringFormat="{}{0:F0}%">
+                                                            <Binding Path="ArtworkScaleRangeStart" />
+                                                        </MultiBinding>
+                                                    </TextBlock.Text>
+                                                </TextBlock>
+                                            </Grid>
+
+                                            <Grid Margin="0,5,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Text="0%"
+                                                           HorizontalAlignment="Left"
+                                                           FontSize="11"
+                                                           Opacity="0.6" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="400%"
+                                                           HorizontalAlignment="Right"
+                                                           FontSize="11"
+                                                           Opacity="0.6" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </fa:SettingsExpander.Items>
+                                </fa:SettingsExpander>
+
+                                <!-- Base & Max Scale Range -->
+                                <fa:SettingsExpander Header="Scale Range"
+                                                     HorizontalAlignment="Stretch"
+                                                     Description="Set the minimum and maximum scale for reactive artwork"
+                                                     IsVisible="{Binding ReactiveArtworkEnabled}">
+                                    <fa:SettingsExpander.IconSource>
+                                        <ic:SymbolIconSource Symbol="ResizeVideo" />
+                                    </fa:SettingsExpander.IconSource>
+                                    <fa:SettingsExpander.Footer>
+                                        <TextBlock Text="{Binding ScaleRangeText}"
+                                                   VerticalAlignment="Center" />
+                                    </fa:SettingsExpander.Footer>
+                                    <fa:SettingsExpander.Items>
+                                        <StackPanel Margin="48,10,10,10">
+                                            <fa:RangeSlider x:Name="ScaleRangeSlider"
+                                                            Minimum="0"
+                                                            Maximum="400"
+                                                            StepFrequency="1"
+                                                            RangeStart="{Binding ArtworkScaleRangeStart}"
+                                                            RangeEnd="{Binding ArtworkScaleRangeEnd}"
+                                                            ShowValueToolTip="True"
+                                                            HorizontalAlignment="Stretch" />
+                                            <Grid Margin="0,5,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Text="0%"
+                                                           HorizontalAlignment="Left"
+                                                           FontSize="11"
+                                                           Opacity="0.6" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="400%"
+                                                           HorizontalAlignment="Right"
+                                                           FontSize="11"
+                                                           Opacity="0.6" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </fa:SettingsExpander.Items>
+                                </fa:SettingsExpander>
+                            </StackPanel>
+                        </fa:SettingsExpander.Items>
+                    </fa:SettingsExpander>
+                </fa:SettingsExpander.Items>
+            </fa:SettingsExpander>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

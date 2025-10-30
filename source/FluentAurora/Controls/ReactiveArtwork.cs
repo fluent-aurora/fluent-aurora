@@ -98,6 +98,8 @@ public class ReactiveArtwork : Control
         AffectsRender<ReactiveArtwork>(SourceImageProperty, IsActiveProperty, CornerRadiusProperty, PlaceholderBrushProperty);
         SourceImageProperty.Changed.AddClassHandler<ReactiveArtwork>((x, e) => x.OnSourceImageChanged(e));
         IsActiveProperty.Changed.AddClassHandler<ReactiveArtwork>((x, e) => x.OnIsActiveChanged(e));
+        BaseScaleProperty.Changed.AddClassHandler<ReactiveArtwork>((x, e) => x.OnBaseScaleChanged(e));
+        MaxScaleProperty.Changed.AddClassHandler<ReactiveArtwork>((x, e) => x.OnMaxScaleChanged(e));
     }
 
     private static IBrush CreateDefaultPlaceholderBrush()
@@ -163,10 +165,54 @@ public class ReactiveArtwork : Control
         UpdatePlaceholderVisibility();
     }
 
+    private void OnBaseScaleChanged(AvaloniaPropertyChangedEventArgs e)
+    {
+        double newBaseScale = (double)(e.NewValue ?? 0.8);
+        Logger.Trace($"ReactiveArtwork: BaseScale changed from {e.OldValue} to {newBaseScale}");
+
+        if (!IsActive)
+        {
+            // Update current and target scale when not active
+            _currentScale = newBaseScale;
+            _targetScale = newBaseScale;
+            InvalidateVisual();
+            InvalidateArrange();
+            Logger.Debug($"ReactiveArtwork: Updated current scale to {newBaseScale} (inactive)");
+        }
+        else
+        {
+            // If already active, animation will handle the transition to new scale
+            Logger.Debug($"ReactiveArtwork: BaseScale updated while active, will affect next intensity calculation");
+        }
+    }
+
+    private void OnMaxScaleChanged(AvaloniaPropertyChangedEventArgs e)
+    {
+        // This is only for Logging purposes, updating is done by the animation and this isn't used when Reactive part isn't active
+        double newMaxScale = (double)(e.NewValue ?? 1.3);
+        Logger.Trace($"ReactiveArtwork: MaxScale changed from {e.OldValue} to {newMaxScale}");
+        
+        if (IsActive)
+        {
+            Logger.Debug($"ReactiveArtwork: MaxScale updated while active, will affect next intensity calculation");
+        }
+    }
+
     private void OnIsActiveChanged(AvaloniaPropertyChangedEventArgs e)
     {
         bool isActive = (bool)(e.NewValue ?? false);
         Logger.Info($"AmbientVisualizer: IsActive changed to {isActive}");
+
+        // Reset to base scale when becoming active
+        if (!isActive)
+        {
+            _currentScale = BaseScale;
+            _targetScale = BaseScale;
+            _currentOpacity = BaseOpacity;
+            _targetOpacity = BaseOpacity;
+            InvalidateVisual();
+            InvalidateArrange();
+        }
 
         UpdatePlaceholderVisibility();
     }
@@ -283,6 +329,12 @@ public class ReactiveArtwork : Control
 
         IsActive = true;
         _isStopping = false;
+        
+        _currentScale = BaseScale;
+        _targetScale = BaseScale;
+        _currentOpacity = BaseOpacity;
+        _targetOpacity = BaseOpacity;
+
         _animationTimer.Start();
         UpdatePlaceholderVisibility();
 

@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using FluentAurora.Core.Logging;
 using FluentAurora.Core.Playback;
+using FluentAurora.Core.Settings;
 using FluentAurora.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,6 +15,7 @@ public partial class ExpandedPlayer : UserControl
     // Properties
     private readonly ExpandedPlayerViewModel? _viewModel;
     private readonly AudioPlayerService? _audioPlayerService;
+    private readonly ISettingsManager? _settingsManager;
     private bool _pointerPressed = false;
     private Point _pressedPoint;
     private ReactiveArtwork? _reactiveArtwork;
@@ -23,6 +25,7 @@ public partial class ExpandedPlayer : UserControl
         InitializeComponent();
         _viewModel = App.Services?.GetRequiredService<ExpandedPlayerViewModel>();
         _audioPlayerService = App.Services?.GetRequiredService<AudioPlayerService>();
+        _settingsManager = App.Services?.GetRequiredService<ISettingsManager>();
         DataContext = _viewModel;
 
         // Wire up seeking events
@@ -43,13 +46,52 @@ public partial class ExpandedPlayer : UserControl
             _audioPlayerService.PlaybackStarted += OnPlaybackStarted;
             _audioPlayerService.PlaybackStopped += OnPlaybackStopped;
         }
+        
+        // Settings changes
+        if (_settingsManager != null)
+        {
+            _settingsManager.ApplicationSettingsChanged += OnSettingsChanged;
+        }
     }
 
     // Events
+    private void OnSettingsChanged(object? sender, ApplicationSettingsStore settings)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            bool isEnabled = settings.Playback.ReactiveArtwork.Enabled;
+            bool isPlaying = _audioPlayerService?.IsPlaying ?? false;
+
+            Logger.Debug($"OnSettingsChanged: ReactiveArtwork enabled={isEnabled}, isPlaying={isPlaying}");
+
+            if (_reactiveArtwork != null)
+            {
+                if (isEnabled && isPlaying)
+                {
+                    // Starting visualization because it was just enabled and music is already playing
+                    Logger.Debug("OnSettingsChanged: Starting ReactiveArtwork");
+                    _reactiveArtwork.Start();
+                }
+                else if (!isEnabled)
+                {
+                    // Stopping the reactive artwork because the setting was disabled
+                    Logger.Debug("OnSettingsChanged: Stopping ReactiveArtwork");
+                    _reactiveArtwork.Stop();
+                }
+            }
+        });
+    }
+
     private void OnSpectrumDataAvailable(float[] data)
     {
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
+            // Reactive Artwork is disabled, no need to process spectrum data
+            if (_viewModel?.IsReactiveArtworkEnabled != true)
+            {
+                return;
+            }
+
             if (data == null || data.Length == 0)
             {
                 Logger.Warning($"OnSpectrumDataAvailable: Invalid spectrum data - {(data == null ? "null" : "empty array")}");
@@ -106,7 +148,15 @@ public partial class ExpandedPlayer : UserControl
     {
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
-            _reactiveArtwork?.Start();
+            if (_viewModel?.IsReactiveArtworkEnabled == true && _reactiveArtwork != null)
+            {
+                Logger.Debug("OnPlaybackStarted: Starting ReactiveArtwork (enabled in settings)");
+                _reactiveArtwork.Start();
+            }
+            else
+            {
+                Logger.Debug("OnPlaybackStarted: ReactiveArtwork disabled in settings, not starting");
+            }
         });
     }
 

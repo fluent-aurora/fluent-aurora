@@ -79,7 +79,8 @@
                         </Button>
 
                         <!-- Previous -->
-                        <Button Width="40"
+                        <Button HotKey="MediaPreviousTrack"
+                                Width="40"
                                 Height="32"
                                 ToolTip.Tip="Previous Track"
                                 Command="{Binding PreviousTrackCommand}">
@@ -88,6 +89,7 @@
 
                         <!-- Play/Pause -->
                         <Button Command="{Binding TogglePlayCommand}"
+                                HotKey="MediaPlayPause"
                                 Width="44"
                                 Height="40"
                                 CornerRadius="20">
@@ -95,7 +97,8 @@
                         </Button>
 
                         <!-- Next -->
-                        <Button Width="40"
+                        <Button HotKey="MediaNextTrack"
+                                Width="40"
                                 Height="32"
                                 ToolTip.Tip="Next Track"
                                 Command="{Binding NextTrackCommand}">

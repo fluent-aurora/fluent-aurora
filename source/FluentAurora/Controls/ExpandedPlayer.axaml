@@ -14,9 +14,8 @@
     </Design.DataContext>
     <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
         <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="40,10,40,20">
-
             <!-- Header with close button -->
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20" ZIndex="1000">
                 <TextBlock Grid.Column="0"
                            Text="Now Playing"
                            FontSize="16"
@@ -348,7 +347,7 @@
                         <StackPanel Grid.Column="2"
                                     Orientation="Horizontal"
                                     Spacing="10">
-                            <Button ToolTip.Tip="Mute/Unmute">
+                            <Button Command="{Binding ToggleMuteCommand}" ToolTip.Tip="Mute/Unmute">
                                 <ic:SymbolIcon Symbol="{Binding VolumeIcon}" FontSize="18" />
                             </Button>
 

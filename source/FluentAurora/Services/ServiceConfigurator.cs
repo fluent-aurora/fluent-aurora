@@ -28,7 +28,6 @@ public static class ServiceConfigurator
         services.AddSingleton<ExpandedPlayerViewModel>();
 
         // Views
-        services.AddSingleton<LibraryView>();
         services.AddSingleton<LibraryViewModel>();
 
         // Windows

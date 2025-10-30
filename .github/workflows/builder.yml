@@ -5,6 +5,11 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      is_stable:
+        description: "Stable Release"
+        required: true
+        type: boolean
   pull_request:
     types: [closed]
     paths:
@@ -51,7 +56,7 @@ jobs:
         run: dotnet publish "source/FluentAurora/FluentAurora.csproj" -c Release -r win-x64 --self-contained false -p:DebugType=none -p:PublishReadyToRun=false -p:PublishSingleFile=false -p:IncludeAllContentForSelfExtract=false -p:PublishTrimmed=false -o publish/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: "Fluent Aurora"
           path: ./publish/
@@ -60,8 +65,7 @@ jobs:
   create-release:
     name: Create Release
     needs: build
-    if: |
-      github.repository == 'fluent-aurora/fluent-aurora' &&
-      github.event_name == 'workflow_dispatch' &&
-      github.ref == 'refs/heads/main'
     uses: ./.github/workflows/release.yml
+    with:
+      is_stable: ${{ inputs.is_stable == 'true' || false }}
+    secrets: inherit

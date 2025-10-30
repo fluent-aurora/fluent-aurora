@@ -2,6 +2,10 @@ name: Create release
 
 on:
   workflow_call:
+    inputs:
+      is_stable:
+        required: true
+        type: boolean
 
 jobs:
   release:
@@ -14,29 +18,120 @@ jobs:
           fetch-depth: 0
 
       - name: Download build artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: "Fluent Aurora"
           path: ./publish/desktop
 
       - name: Create ZIP archive
         run: |
+          Write-Host "Creating ZIP archive from build artifacts..."
           cd publish/desktop
+          Write-Host "Files to be archived:"
+          Get-ChildItem -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
           powershell Compress-Archive -Path * -DestinationPath ../../fluent_aurora.zip
+          cd ../..
+          $zipSize = (Get-Item fluent_aurora.zip).Length / 1MB
+          Write-Host "ZIP archive created successfully. Size: $([math]::Round($zipSize, 2)) MB"
 
-      - name: Get short SHA
-        id: slug
+      - name: Get release metadata
+        id: info
+        shell: pwsh
         run: |
-          $shortSha = "${{ github.sha }}".Substring(0,9)
-          echo "sha_short=$shortSha" >> $env:GITHUB_OUTPUT
+          $sha = "${{ github.sha }}"
+          Write-Host "Commit SHA: $sha"
+          $shortSha = $sha.Substring(0,9)
+          Write-Host "Short SHA: $shortSha"
+          $branch = "${{ github.ref_name }}"
+          Write-Host "Branch: $branch"
+          $buildDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss 'UTC'"
+          Write-Host "Build Date: $buildDate"
 
-      - name: Draft release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Fluent Aurora (${{ steps.slug.outputs.sha_short }})
-          draft: true
-          files: fluent_aurora.zip
-          tag_name: ${{ steps.slug.outputs.sha_short }}
-          generate_release_notes: true
+          Write-Host "`nFetching latest stable release..."
+          $latestRelease = $(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty' 2>$null)
+          if (-not $latestRelease -or $latestRelease -eq "nightly") {
+              Write-Host "No previous stable release found. Comparing from first commit..."
+              $firstCommit = $(git rev-list --max-parents=0 HEAD)
+              Write-Host "First commit: $firstCommit"
+              $compareUrl = "${{ github.server_url }}/${{ github.repository }}/compare/$firstCommit...$sha"
+          } else {
+              Write-Host "Latest stable release: $latestRelease"
+              $compareUrl = "${{ github.server_url }}/${{ github.repository }}/compare/$latestRelease...$sha"
+          }
+
+          Write-Host "Compare URL: $compareUrl"
+          echo "sha_short=$shortSha" >> $env:GITHUB_OUTPUT
+          echo "branch=$branch" >> $env:GITHUB_OUTPUT
+          echo "build_date=$buildDate" >> $env:GITHUB_OUTPUT
+          echo "compare_url=$compareUrl" >> $env:GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create or Update Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $isStable = [System.Convert]::ToBoolean("${{ inputs.is_stable }}")
+          $shaShort = "${{ steps.info.outputs.sha_short }}"
+          $branch = "${{ steps.info.outputs.branch }}"
+          $buildDate = "${{ steps.info.outputs.build_date }}"
+          $compareUrl = "${{ steps.info.outputs.compare_url }}"
+
+          Write-Host "Release Type: $(if ($isStable) { 'Stable' } else { 'Nightly' })"
+          if ($isStable) {
+              Write-Host "Creating stable draft release..."
+              gh release create $shaShort fluent_aurora.zip --draft --generate-notes --title "Fluent Aurora ($shaShort)"
+              if ($LASTEXITCODE -eq 0) {
+                  Write-Host "Stable draft release created successfully!"
+                  Write-Host "Note: Release is in draft mode and needs to be published manually."
+              } else {
+                  Write-Host "Failed to create stable release. Exit code: $LASTEXITCODE"
+                  exit 1
+              }
+          } else {
+              Write-Host "Creating or updating nightly pre-release..."
+              $tag = "nightly"
+
+              $notes = @"
+          This is an automated nightly build containing the latest changes from the $branch branch.
+
+          ⚠️ Warning: This is a development build and may contain bugs or incomplete features.
+          📋 See all changes since the latest release: $compareUrl
+
+          📅 Build Date: $buildDate
+          📝 Commit: $shaShort
+          🌿 Branch: $branch
+          "@
+
+              Write-Host "`nChecking if nightly release exists..."
+              gh release view $tag --json id 2>$null
+              if ($LASTEXITCODE -eq 0) {
+                  Write-Host "✓ Nightly release found. Updating..."
+                  Write-Host "`nDeleting existing release and tag..."
+                  gh release delete $tag --yes --cleanup-tag
+                  if ($LASTEXITCODE -eq 0) {
+                      Write-Host "Old release deleted successfully"
+                  } else {
+                      Write-Host "Failed to delete old release. Exit code: $LASTEXITCODE"
+                      exit 1
+                  }
+                  Write-Host "`nCreating fresh nightly release"
+                  gh release create $tag fluent_aurora.zip --prerelease --title "Fluent Aurora (Nightly)" --notes "$notes" --target $branch
+                  if ($LASTEXITCODE -eq 0) {
+                      Write-Host "Nightly release updated successfully!"
+                  } else {
+                      Write-Host "Failed to create new nightly release. Exit code: $LASTEXITCODE"
+                      exit 1
+                  }
+              } else {
+                  Write-Host "No existing nightly release found. Creating new one..."
+                  gh release create $tag fluent_aurora.zip --prerelease --title "Fluent Aurora (Nightly)" --notes "$notes"
+                  if ($LASTEXITCODE -eq 0) {
+                      Write-Host "Nightly release created successfully!"
+                  } else {
+                      Write-Host "Failed to create nightly release. Exit code: $LASTEXITCODE"
+                      exit 1
+                  }
+              }
+          }

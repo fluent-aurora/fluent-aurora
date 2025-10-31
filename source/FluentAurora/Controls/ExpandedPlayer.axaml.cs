@@ -50,7 +50,7 @@ public partial class ExpandedPlayer : UserControl
         // Settings changes
         if (_settingsManager != null)
         {
-            _settingsManager.ApplicationSettingsChanged += OnSettingsChanged;
+            _settingsManager.SettingsChanged += OnSettingsChanged;
         }
     }
 

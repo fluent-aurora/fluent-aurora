@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+﻿using FluentAurora.Core.Paths;
 
 namespace FluentAurora.Core.Settings;
 
@@ -6,16 +6,13 @@ public interface IApplicationSettings : ISettingsService<ApplicationSettingsStor
 {
 }
 
-public class ApplicationSettings : AbstractSettings<ApplicationSettingsStore>, IApplicationSettings
+public class ApplicationSettings() : JsonSettingsService<ApplicationSettingsStore>(Path.Combine(PathResolver.Config, "config.json")), IApplicationSettings
 {
-    public ApplicationSettings() : base("config.json")
-    {
-    }
-
-    protected override ApplicationSettingsStore DefaultSettings => new ApplicationSettingsStore
+    protected override ApplicationSettingsStore Default => new ApplicationSettingsStore
     {
         Playback = new PlaybackSettings
         {
+            Volume = 1.0f,
             ReactiveArtwork = new ReactiveArtwork
             {
                 Enabled = false,
@@ -24,14 +21,7 @@ public class ApplicationSettings : AbstractSettings<ApplicationSettingsStore>, I
                     Base = 0.8,
                     Max = 1.3
                 }
-            },
-            Volume = 1.0f
+            }
         }
     };
-}
-
-public class ApplicationSettingsStore
-{
-    [JsonPropertyName("playback")]
-    public PlaybackSettings Playback { get; set; } = new PlaybackSettings();
 }

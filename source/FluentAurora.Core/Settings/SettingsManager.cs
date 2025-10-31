@@ -3,37 +3,27 @@
 public interface ISettingsManager : IDisposable
 {
     ApplicationSettingsStore Application { get; }
+    event EventHandler<ApplicationSettingsStore>? SettingsChanged;
     void SaveAll();
-    event EventHandler<ApplicationSettingsStore>? ApplicationSettingsChanged;
+    void ReloadAll();
 }
 
 public class SettingsManager : ISettingsManager
 {
-    private readonly IApplicationSettings _applicationSettings;
+    private readonly IApplicationSettings _appSettings;
 
-    public event EventHandler<ApplicationSettingsStore>? ApplicationSettingsChanged;
+    public event EventHandler<ApplicationSettingsStore>? SettingsChanged;
 
-    public SettingsManager(IApplicationSettings applicationSettings)
+    public SettingsManager(IApplicationSettings appSettings)
     {
-        _applicationSettings = applicationSettings;
-
-        _applicationSettings.SettingsChanged += OnApplicationSettingsChanged;
+        _appSettings = appSettings;
+        _appSettings.Changed += (_, s) => SettingsChanged?.Invoke(this, s);
     }
 
-    public ApplicationSettingsStore Application => _applicationSettings.Settings;
+    public ApplicationSettingsStore Application => _appSettings.Current;
 
-    public void SaveAll()
-    {
-        _applicationSettings.SaveSettings();
-    }
+    public void SaveAll() => _appSettings.Save();
+    public void ReloadAll() => _appSettings.Reload();
 
-    private void OnApplicationSettingsChanged(object? sender, ApplicationSettingsStore settings)
-    {
-        ApplicationSettingsChanged?.Invoke(this, settings);
-    }
-
-    public void Dispose()
-    {
-        _applicationSettings.SettingsChanged -= OnApplicationSettingsChanged;
-    }
+    public void Dispose() => _appSettings.Changed -= (_, s) => SettingsChanged?.Invoke(this, s);
 }

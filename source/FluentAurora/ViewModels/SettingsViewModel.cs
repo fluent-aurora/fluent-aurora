@@ -26,7 +26,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         _settingsManager = settingsManager;
         ApplySettings(_settingsManager.Application);
-        _settingsManager.ApplicationSettingsChanged += OnSettingsChanged;
+        _settingsManager.SettingsChanged += OnSettingsChanged;
     }
 
     // Functions
@@ -121,6 +121,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         _saveDebounceTimer?.Cancel();
         _saveDebounceTimer?.Dispose();
-        _settingsManager.ApplicationSettingsChanged -= OnSettingsChanged;
+        _settingsManager.SettingsChanged -= OnSettingsChanged;
     }
 }

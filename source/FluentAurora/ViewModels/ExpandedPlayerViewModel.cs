@@ -45,7 +45,7 @@ public partial class ExpandedPlayerViewModel : CompactPlayerViewModel
         playbackControlService, storagePickerService)
     {
         _settingsManager = settingsManager;
-        _settingsManager.ApplicationSettingsChanged += (_, _) =>
+        _settingsManager.SettingsChanged += (_, _) =>
         {
             Dispatcher.UIThread.Post(LoadSettingsValues);
         };

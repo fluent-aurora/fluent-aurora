@@ -328,12 +328,6 @@
                         <StackPanel Grid.Column="0"
                                     Orientation="Horizontal"
                                     Spacing="12">
-                            <Button Command="{Binding OpenFileCommand}"
-                                    ToolTip.Tip="Open File"
-                                    AutomationProperties.Name="Open File">
-                                <ic:SymbolIcon Symbol="FolderOpen" FontSize="18" />
-                            </Button>
-
                             <Button ToolTip.Tip="Show Queue"
                                     Command="{Binding ToggleQueueCommand}">
                                 <ic:SymbolIcon Symbol="List" FontSize="18" />

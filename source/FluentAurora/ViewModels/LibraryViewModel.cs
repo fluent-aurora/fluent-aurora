@@ -23,13 +23,20 @@ public enum ViewMode
     Playlists
 }
 
-public partial class LibraryViewModel : ViewModelBase
+public partial class LibraryViewModel : ViewModelBase, IDisposable
 {
     private readonly DatabaseManager _databaseManager;
     private readonly StoragePickerService _storagePickerService;
     private readonly AudioPlayerService _audioPlayerService;
     private readonly PlaylistDialogService _playlistDialogService;
     private CancellationTokenSource? _searchCts;
+
+    // Track if there is loading happening to prevent duplicate loads
+    private bool _isLoadingFolders = false;
+    private bool _isDisposed = false;
+    private readonly SemaphoreSlim _foldersLoadSemaphore = new SemaphoreSlim(1, 1);
+    private readonly SemaphoreSlim _playlistsLoadSemaphore = new SemaphoreSlim(1, 1);
+    private readonly SemaphoreSlim _songsLoadSemaphore = new SemaphoreSlim(1, 1);
 
     [ObservableProperty] private ViewMode currentViewMode = ViewMode.Folders;
 
@@ -52,64 +59,91 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty] private string searchQuery = string.Empty;
     [ObservableProperty] private int totalSongCount = 0;
 
+    // View mode toggle button properties
+    [ObservableProperty] private bool showFolders = true;
+    [ObservableProperty] private bool showAllSongs = false;
+    [ObservableProperty] private bool showPlaylists = false;
+
     public LibraryViewModel(DatabaseManager databaseManager, StoragePickerService storagePickerService, AudioPlayerService audioPlayerService, PlaylistDialogService playlistDialogService)
     {
         _databaseManager = databaseManager;
-        DatabaseManager.SongDeleted += async _ =>
-        {
-            switch (CurrentViewMode)
-            {
-                case ViewMode.Playlists:
-                    await LoadPlaylistsAsync();
-                    break;
-                case ViewMode.Folders:
-                    await LoadFoldersAsync();
-                    break;
-                case ViewMode.AllSongs:
-                    await LoadSongsAsync();
-                    break;
-            }
-        };
-        DatabaseManager.FolderDeleted += async _ =>
-        {
-            switch (CurrentViewMode)
-            {
-                case ViewMode.Playlists:
-                    await LoadPlaylistsAsync();
-                    break;
-                case ViewMode.Folders:
-                    await LoadFoldersAsync();
-                    break;
-                case ViewMode.AllSongs:
-                    await LoadSongsAsync();
-                    break;
-            }
-        };
-        DatabaseManager.SongsAdded += async () =>
-        {
-            switch (CurrentViewMode)
-            {
-                case ViewMode.Playlists:
-                    await LoadPlaylistsAsync();
-                    break;
-                case ViewMode.Folders:
-                    await LoadFoldersAsync();
-                    break;
-                case ViewMode.AllSongs:
-                    await LoadSongsAsync();
-                    break;
-            }
-        };
         _storagePickerService = storagePickerService;
         _audioPlayerService = audioPlayerService;
         _playlistDialogService = playlistDialogService;
-        LoadFolders();
-        LoadPlaylists();
+        SubscribeToEvents();
+
+        // Initial load
+        _ = InitializeAsync();
     }
 
-    public bool ShowFolders => CurrentViewMode == ViewMode.Folders;
-    public bool ShowAllSongs => CurrentViewMode == ViewMode.AllSongs;
-    public bool ShowPlaylists => CurrentViewMode == ViewMode.Playlists;
+    private void SubscribeToEvents()
+    {
+        DatabaseManager.SongDeleted += OnSongDeleted;
+        DatabaseManager.FolderDeleted += OnFolderDeleted;
+        DatabaseManager.SongsAdded += OnSongsAdded;
+    }
+
+    private void UnsubscribeFromEvents()
+    {
+        DatabaseManager.SongDeleted -= OnSongDeleted;
+        DatabaseManager.FolderDeleted -= OnFolderDeleted;
+        DatabaseManager.SongsAdded -= OnSongsAdded;
+    }
+
+    private async Task InitializeAsync()
+    {
+        await LoadFoldersAsync();
+        await LoadPlaylistsAsync();
+    }
+
+    private async void OnSongDeleted(string filePath)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+        await RefreshCurrentViewAsync();
+    }
+
+    private async void OnFolderDeleted(string folderPath)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+        await RefreshCurrentViewAsync();
+    }
+
+    private async void OnSongsAdded()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+        await Task.Delay(100);
+        await RefreshCurrentViewAsync();
+    }
+
+    private async Task RefreshCurrentViewAsync()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        switch (CurrentViewMode)
+        {
+            case ViewMode.Playlists:
+                await LoadPlaylistsAsync();
+                break;
+            case ViewMode.Folders:
+                await LoadFoldersAsync();
+                break;
+            case ViewMode.AllSongs:
+                await LoadSongsAsync();
+                break;
+        }
+    }
 
     public string ViewModeText => CurrentViewMode switch
     {
@@ -119,27 +153,47 @@ public partial class LibraryViewModel : ViewModelBase
         _ => "Folders"
     };
 
+    partial void OnShowFoldersChanged(bool value)
+    {
+        if (value)
+        {
+            CurrentViewMode = ViewMode.Folders;
+            ShowAllSongs = false;
+            ShowPlaylists = false;
+        }
+    }
+
+    partial void OnShowAllSongsChanged(bool value)
+    {
+        if (value)
+        {
+            CurrentViewMode = ViewMode.AllSongs;
+            ShowFolders = false;
+            ShowPlaylists = false;
+        }
+    }
+
+    partial void OnShowPlaylistsChanged(bool value)
+    {
+        if (value)
+        {
+            CurrentViewMode = ViewMode.Playlists;
+            ShowFolders = false;
+            ShowAllSongs = false;
+        }
+    }
+
     partial void OnCurrentViewModeChanged(ViewMode value)
     {
-        OnPropertyChanged(nameof(ShowFolders));
-        OnPropertyChanged(nameof(ShowAllSongs));
-        OnPropertyChanged(nameof(ShowPlaylists));
         OnPropertyChanged(nameof(ViewModeText));
 
-        switch (value)
+        _ = value switch
         {
-            case ViewMode.AllSongs:
-                _ = LoadSongsAsync();
-                break;
-            case ViewMode.Playlists:
-                LoadPlaylists();
-                break;
-            case ViewMode.Folders:
-                LoadFolders();
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(value), value, null);
-        }
+            ViewMode.AllSongs => LoadSongsAsync(),
+            ViewMode.Playlists => LoadPlaylistsAsync(),
+            ViewMode.Folders => LoadFoldersAsync(),
+            _ => Task.CompletedTask
+        };
     }
 
     partial void OnSearchQueryChanged(string value)
@@ -175,6 +229,23 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void SetViewMode(string mode)
+    {
+        switch (mode)
+        {
+            case "Folders":
+                ShowFolders = true;
+                break;
+            case "AllSongs":
+                ShowAllSongs = true;
+                break;
+            case "Playlists":
+                ShowPlaylists = true;
+                break;
+        }
+    }
+
+    [RelayCommand]
     private void ClearSearch()
     {
         SearchQuery = string.Empty;
@@ -183,6 +254,12 @@ public partial class LibraryViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadSongsAsync()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        await _songsLoadSemaphore.WaitAsync();
         try
         {
             IsSearching = true;
@@ -209,6 +286,7 @@ public partial class LibraryViewModel : ViewModelBase
         {
             IsSearching = false;
             IsLoadingSongs = false;
+            _songsLoadSemaphore.Release();
         }
     }
 
@@ -222,20 +300,33 @@ public partial class LibraryViewModel : ViewModelBase
             ViewMode.Playlists => ViewMode.Folders,
             _ => throw new ArgumentOutOfRangeException("Unknown view mode")
         };
+
+        // Update toggle button states
+        ShowFolders = CurrentViewMode == ViewMode.Folders;
+        ShowAllSongs = CurrentViewMode == ViewMode.AllSongs;
+        ShowPlaylists = CurrentViewMode == ViewMode.Playlists;
     }
 
     [RelayCommand]
     private async Task LoadFoldersAsync()
     {
+        if (_isDisposed || _isLoadingFolders)
+        {
+            return;
+        }
+
+        await _foldersLoadSemaphore.WaitAsync();
         try
         {
+            _isLoadingFolders = true;
             Logger.Info("Loading folders from the database...");
 
-            Folders.Clear();
-
-            // Load folders with song count only, not the actual songs
+            // Get the data first
             List<FolderRecord> folders = await Task.Run(() => _databaseManager.GetAllFolders());
+            int songCount = await Task.Run(() => _databaseManager.GetSongCount(null));
 
+            // Create new collection
+            List<FolderPlaylistViewModel> newFolders = new List<FolderPlaylistViewModel>();
             foreach (FolderRecord folder in folders)
             {
                 FolderPlaylistViewModel folderVm = new FolderPlaylistViewModel(_databaseManager)
@@ -245,31 +336,50 @@ public partial class LibraryViewModel : ViewModelBase
                     SongCount = folder.SongCount,
                     IsExpanded = false
                 };
-
-                Folders.Add(folderVm);
+                newFolders.Add(folderVm);
             }
 
+            // Update UI
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                Folders.Clear();
+                foreach (FolderPlaylistViewModel folder in newFolders)
+                {
+                    Folders.Add(folder);
+                }
+            });
+
+            TotalSongCount = songCount;
             Logger.Info($"Loaded {Folders.Count} folders");
         }
         catch (Exception ex)
         {
             Logger.Error($"Failed to load folders: {ex}");
         }
+        finally
+        {
+            _isLoadingFolders = false;
+            _foldersLoadSemaphore.Release();
+        }
     }
-
-    private void LoadFolders() => _ = LoadFoldersAsync();
 
     [RelayCommand]
     private async Task LoadPlaylistsAsync()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        await _playlistsLoadSemaphore.WaitAsync();
         try
         {
             Logger.Info("Loading playlists from the database...");
 
-            Playlists.Clear();
-
             List<PlaylistRecord> playlists = await Task.Run(() => _databaseManager.GetAllPlaylists());
 
+            // Create new collection
+            List<PlaylistViewModel> newPlaylists = new List<PlaylistViewModel>();
             foreach (PlaylistRecord playlist in playlists)
             {
                 PlaylistViewModel playlistVm = new PlaylistViewModel(_databaseManager)
@@ -283,13 +393,23 @@ public partial class LibraryViewModel : ViewModelBase
                     TotalDuration = playlist.TotalDuration,
                     IsExpanded = false
                 };
-
-                Playlists.Add(playlistVm);
+                newPlaylists.Add(playlistVm);
             }
 
+            // Update UI
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                Playlists.Clear();
+                foreach (var playlist in newPlaylists)
+                {
+                    Playlists.Add(playlist);
+                }
+            });
+
+            // Load artwork
             await Task.Run(() =>
             {
-                foreach (var playlist in Playlists)
+                foreach (PlaylistViewModel playlist in Playlists)
                 {
                     try
                     {
@@ -308,9 +428,11 @@ public partial class LibraryViewModel : ViewModelBase
         {
             Logger.Error($"Failed to load playlists: {ex}");
         }
+        finally
+        {
+            _playlistsLoadSemaphore.Release();
+        }
     }
-
-    private void LoadPlaylists() => _ = LoadPlaylistsAsync();
 
     [RelayCommand]
     private async Task AddFolder()
@@ -326,6 +448,9 @@ public partial class LibraryViewModel : ViewModelBase
 
             Logger.Debug($"Indexing folder: {folderPath}");
             IndexingFolderName = Path.GetFileName(folderPath);
+
+            // Temporarily unsubscribe from events to prevent duplicate loads
+            UnsubscribeFromEvents();
 
             // Run indexing in background
             await Task.Run(() =>
@@ -358,6 +483,9 @@ public partial class LibraryViewModel : ViewModelBase
                     Logger.Debug($"Indexed {SongsIndexed}/{TotalSongsToIndex} songs");
                 }
             });
+
+            // Manually reload folders after indexing
+            await LoadFoldersAsync();
         }
         catch (Exception ex)
         {
@@ -366,7 +494,38 @@ public partial class LibraryViewModel : ViewModelBase
         finally
         {
             IsIndexing = false;
-            await LoadFoldersAsync();
+            // Re-subscribe to events
+            SubscribeToEvents();
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenFile()
+    {
+        string? filePath = await _storagePickerService.PickAudioFileAsync();
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            _audioPlayerService.ClearQueue();
+            try
+            {
+                // Temporarily unsubscribe to prevent duplicate loads
+                UnsubscribeFromEvents();
+
+                await _audioPlayerService.PlayFileAsync(filePath);
+
+                // Small delay then reload
+                await Task.Delay(100);
+                await LoadFoldersAsync();
+            }
+            catch (FileNotFoundException)
+            {
+                Logger.Error($"File not found: {filePath}");
+            }
+            finally
+            {
+                // Re-subscribe
+                SubscribeToEvents();
+            }
         }
     }
 
@@ -622,7 +781,7 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void DeletePlaylist(PlaylistViewModel playlist)
+    private async Task DeletePlaylist(PlaylistViewModel playlist)
     {
         if (playlist == null)
         {
@@ -632,7 +791,7 @@ public partial class LibraryViewModel : ViewModelBase
 
         Logger.Info($"Deleting playlist: {playlist.Name}");
         DatabaseManager.DeletePlaylist(playlist.Id);
-        LoadPlaylists();
+        await LoadPlaylistsAsync();
     }
 
     [RelayCommand]
@@ -841,6 +1000,74 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void MovePlaylistSongUp(PlaylistSongViewModel? playlistSong)
+    {
+        if (playlistSong?.Playlist == null || playlistSong.Song == null)
+        {
+            Logger.Warning("Cannot move song up: invalid parameters");
+            return;
+        }
+
+        try
+        {
+            int currentIndex = playlistSong.Playlist.PlaylistSongs.IndexOf(playlistSong);
+            if (currentIndex > 0)
+            {
+                // Move in UI
+                playlistSong.Playlist.PlaylistSongs.Move(currentIndex, currentIndex - 1);
+
+                // Update Database
+                List<string?> songFilePathsInOrder = playlistSong.Playlist.PlaylistSongs
+                    .Select(playlistSongViewModel => playlistSongViewModel.Song?.FilePath)
+                    .Where(filePath => !string.IsNullOrEmpty(filePath))
+                    .ToList();
+
+                DatabaseManager.UpdatePlaylistSongPositions(playlistSong.Playlist.Id, songFilePathsInOrder);
+
+                Logger.Info($"Moved '{playlistSong.Song.Title}' up in playlist '{playlistSong.Playlist.Name}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to move song up: {ex}");
+        }
+    }
+
+    [RelayCommand]
+    private void MovePlaylistSongDown(PlaylistSongViewModel? playlistSong)
+    {
+        if (playlistSong?.Playlist == null || playlistSong.Song == null)
+        {
+            Logger.Warning("Cannot move song down: invalid parameters");
+            return;
+        }
+
+        try
+        {
+            int currentIndex = playlistSong.Playlist.PlaylistSongs.IndexOf(playlistSong);
+            if (currentIndex >= 0 && currentIndex < playlistSong.Playlist.PlaylistSongs.Count - 1)
+            {
+                // Move in UI
+                playlistSong.Playlist.PlaylistSongs.Move(currentIndex, currentIndex + 1);
+
+                // Update Database
+                List<string?> songFilePathsInOrder = playlistSong.Playlist.PlaylistSongs
+                    .Select(playlistSongViewModel => playlistSongViewModel.Song?.FilePath)
+                    .Where(filePath => !string.IsNullOrEmpty(filePath))
+                    .ToList();
+
+                DatabaseManager.UpdatePlaylistSongPositions(playlistSong.Playlist.Id, songFilePathsInOrder);
+
+                Logger.Info($"Moved '{playlistSong.Song.Title}' down in playlist '{playlistSong.Playlist.Name}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to move song down: {ex}");
+        }
+    }
+
+    [RelayCommand]
     private void OpenPlaylistDetails(PlaylistViewModel playlist)
     {
         if (playlist == null)
@@ -884,81 +1111,21 @@ public partial class LibraryViewModel : ViewModelBase
         SelectedPlaylist = null;
     }
 
-    [RelayCommand]
-    private async Task MovePlaylistSongUp(PlaylistSongViewModel? playlistSong)
+    public void Dispose()
     {
-        if (playlistSong?.Playlist == null || SelectedPlaylist == null)
+        if (_isDisposed)
         {
             return;
         }
 
-        int currentIndex = SelectedPlaylist.PlaylistSongs.IndexOf(playlistSong);
-        if (currentIndex <= 0)
-        {
-            Logger.Debug("Cannot move song up: already at the top");
-            return;
-        }
+        _isDisposed = true;
 
-        try
-        {
-            // Move in UI
-            SelectedPlaylist.PlaylistSongs.Move(currentIndex, currentIndex - 1);
+        // Clean up event handlers to prevent memory leaks
+        UnsubscribeFromEvents();
 
-            // Update database
-            await Task.Run(() =>
-            {
-                List<string> songPaths = SelectedPlaylist.PlaylistSongs
-                    .Select(ps => ps.Song.FilePath!)
-                    .Where(path => !string.IsNullOrEmpty(path))
-                    .ToList();
-
-                DatabaseManager.UpdatePlaylistSongPositions(SelectedPlaylist.Id, songPaths);
-            });
-
-            Logger.Info($"Moved '{playlistSong.Song.Title}' up in playlist '{SelectedPlaylist.Name}'");
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Failed to move song up: {ex}");
-        }
-    }
-
-    [RelayCommand]
-    private async Task MovePlaylistSongDown(PlaylistSongViewModel? playlistSong)
-    {
-        if (playlistSong?.Playlist == null || SelectedPlaylist == null)
-        {
-            return;
-        }
-
-        int currentIndex = SelectedPlaylist.PlaylistSongs.IndexOf(playlistSong);
-        if (currentIndex < 0 || currentIndex >= SelectedPlaylist.PlaylistSongs.Count - 1)
-        {
-            Logger.Debug("Cannot move song down: already at the bottom");
-            return;
-        }
-
-        try
-        {
-            // Move in UI
-            SelectedPlaylist.PlaylistSongs.Move(currentIndex, currentIndex + 1);
-
-            // Update database
-            await Task.Run(() =>
-            {
-                List<string> songPaths = SelectedPlaylist.PlaylistSongs
-                    .Select(ps => ps.Song.FilePath!)
-                    .Where(path => !string.IsNullOrEmpty(path))
-                    .ToList();
-
-                DatabaseManager.UpdatePlaylistSongPositions(SelectedPlaylist.Id, songPaths);
-            });
-
-            Logger.Info($"Moved '{playlistSong.Song.Title}' down in playlist '{SelectedPlaylist.Name}'");
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"Failed to move song down: {ex}");
-        }
+        _searchCts?.Dispose();
+        _foldersLoadSemaphore?.Dispose();
+        _playlistsLoadSemaphore?.Dispose();
+        _songsLoadSemaphore?.Dispose();
     }
 }

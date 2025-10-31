@@ -365,23 +365,6 @@ public partial class CompactPlayerViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task OpenFile()
-    {
-        string? filePath = await _storagePickerService.PickAudioFileAsync();
-        if (!string.IsNullOrEmpty(filePath))
-        {
-            _audioPlayerService.ClearQueue();
-            try
-            {
-                await _audioPlayerService.PlayFileAsync(filePath);
-            }
-            catch (FileNotFoundException)
-            {
-            }
-        }
-    }
-
-    [RelayCommand]
     private void ToggleMute()
     {
         if (IsMuted)

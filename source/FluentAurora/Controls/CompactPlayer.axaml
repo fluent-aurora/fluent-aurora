@@ -160,15 +160,6 @@
                   ColumnDefinitions="Auto,Auto,Auto,*"
                   ColumnSpacing="8">
 
-                <!-- Open File Button -->
-                <Button Grid.Column="0"
-                        Command="{Binding OpenFileCommand}"
-                        Width="40"
-                        Height="32"
-                        ToolTip.Tip="Open File">
-                    <ic:SymbolIcon Symbol="FolderOpen" FontSize="16" />
-                </Button>
-
                 <!-- Mute Button -->
                 <Button Grid.Column="1"
                         Width="40"

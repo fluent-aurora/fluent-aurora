@@ -46,7 +46,7 @@ public partial class ExpandedPlayer : UserControl
             _audioPlayerService.PlaybackStarted += OnPlaybackStarted;
             _audioPlayerService.PlaybackStopped += OnPlaybackStopped;
         }
-        
+
         // Settings changes
         if (_settingsManager != null)
         {
@@ -55,6 +55,18 @@ public partial class ExpandedPlayer : UserControl
     }
 
     // Events
+    private void OnQueueItemPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // Only handle left clicks
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            if (sender is Border border && border.DataContext is ExpandedPlayerViewModel.QueueItemViewModel item)
+            {
+                _viewModel?.PlayQueueItemCommand.Execute(item);
+                e.Handled = true;
+            }
+        }
+    }
     private void OnSettingsChanged(object? sender, ApplicationSettingsStore settings)
     {
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>

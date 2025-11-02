@@ -146,83 +146,109 @@
                         </Grid>
 
                         <!-- Song List -->
-                        <ScrollViewer Grid.Row="1"
-                                      x:Name="QueueScrollViewer"
-                                      VerticalScrollBarVisibility="Auto">
-                            <ItemsControl ItemsSource="{Binding QueueItems}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Command="{Binding DataContext.PlayQueueItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Background="Transparent"
-                                                BorderBrush="Transparent"
-                                                Padding="0"
-                                                Margin="0,2,14,2"
-                                                HorizontalAlignment="Stretch"
-                                                HorizontalContentAlignment="Stretch">
-                                            <Border Padding="8,6"
+                        <ListBox Grid.Row="1"
+                                 x:Name="QueueListBox"
+                                 ItemsSource="{Binding QueueItems}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 Margin="0,0,14,0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 SelectionMode="Single">
+
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0,2,12,2" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="CornerRadius" Value="6" />
+                                </Style>
+                                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="Transparent" />
+                                </Style>
+                                <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="Transparent" />
+                                </Style>
+                                <Style Selector="ListBoxItem:selected">
+                                    <Setter Property="Background" Value="Transparent" />
+                                </Style>
+                            </ListBox.Styles>
+
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="8,6"
+                                            CornerRadius="6"
+                                            Cursor="Hand"
+                                            Background="{Binding IsCurrentlyPlaying, Converter={x:Static converters:QueueBoolToBackgroundConverter.Instance}}"
+                                            PointerPressed="OnQueueItemPointerPressed">
+                                        <Border.ContextFlyout>
+                                            <MenuFlyout>
+                                                <MenuItem Header="Remove Song"
+                                                          Command="{Binding DataContext.RemoveSongCommand, ElementName=ExpandedPlayerRoot}"
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Icon>
+                                                        <ic:SymbolIcon Symbol="Delete" />
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
+                                            </MenuFlyout>
+                                        </Border.ContextFlyout>
+
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <!-- Icon -->
+                                            <Border Grid.Column="0"
+                                                    Width="40" Height="40"
                                                     CornerRadius="6"
-                                                    Cursor="Hand"
-                                                    Background="{Binding IsCurrentlyPlaying, Converter={x:Static converters:QueueBoolToBackgroundConverter.Instance}}">
-                                                <Border.ContextFlyout>
-                                                    <MenuFlyout>
-                                                        <MenuItem Header="Remove Song"
-                                                                  Command="{Binding DataContext.RemoveSongCommand, ElementName=ExpandedPlayerRoot}"
-                                                                  CommandParameter="{Binding}">
-                                                            <MenuItem.Icon>
-                                                                <ic:SymbolIcon Symbol="Delete" />
-                                                            </MenuItem.Icon>
-                                                        </MenuItem>
-                                                    </MenuFlyout>
-                                                </Border.ContextFlyout>
-                                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                                    <!-- Icon -->
-                                                    <Border Grid.Column="0"
-                                                            Width="40" Height="40"
-                                                            CornerRadius="6"
-                                                            Background="#FF2D2D2D"
-                                                            Margin="0,0,12,0">
-                                                        <Grid>
-                                                            <!-- Not playing icon -->
-                                                            <ic:SymbolIcon Symbol="MusicNote2"
-                                                                           FontSize="18"
-                                                                           Opacity="0.5"
-                                                                           HorizontalAlignment="Center"
-                                                                           VerticalAlignment="Center"
-                                                                           IsVisible="{Binding !IsCurrentlyPlaying}" />
+                                                    Background="#FF2D2D2D"
+                                                    Margin="0,0,12,0">
+                                                <Grid>
+                                                    <!-- Not playing icon -->
+                                                    <ic:SymbolIcon Symbol="MusicNote2"
+                                                                   FontSize="18"
+                                                                   Opacity="0.5"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   IsVisible="{Binding !IsCurrentlyPlaying}" />
 
-                                                            <!-- Playing icon -->
-                                                            <ic:SymbolIcon Symbol="SoundWaveCircle"
-                                                                           FontSize="18"
-                                                                           HorizontalAlignment="Center"
-                                                                           VerticalAlignment="Center"
-                                                                           IsVisible="{Binding IsCurrentlyPlaying}" />
-                                                        </Grid>
-                                                    </Border>
-
-                                                    <!-- Title/Artist -->
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding Title}"
-                                                                   FontSize="14" />
-                                                        <TextBlock Text="{Binding Artist}"
-                                                                   FontSize="12"
-                                                                   Opacity="0.7" />
-                                                    </StackPanel>
-
-                                                    <!-- Duration -->
-                                                    <TextBlock Grid.Column="2"
-                                                               Text="{Binding Duration, Converter={x:Static converters:PositionToTimeConverter.Instance}}"
-                                                               FontSize="12"
-                                                               Opacity="0.6"
-                                                               HorizontalAlignment="Right"
-                                                               VerticalAlignment="Center" />
+                                                    <!-- Playing icon -->
+                                                    <ic:SymbolIcon Symbol="SoundWaveCircle"
+                                                                   FontSize="18"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   IsVisible="{Binding IsCurrentlyPlaying}" />
                                                 </Grid>
                                             </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
+
+                                            <!-- Title/Artist -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="14"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Artist}"
+                                                           FontSize="12"
+                                                           Opacity="0.7"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <!-- Duration -->
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding Duration, Converter={x:Static converters:PositionToTimeConverter.Instance}}"
+                                                       FontSize="12"
+                                                       Opacity="0.6"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center"
+                                                       Margin="8,0,0,0" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </Grid>
                 </Border>
             </Grid>

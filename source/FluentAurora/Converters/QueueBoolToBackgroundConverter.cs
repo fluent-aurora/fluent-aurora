@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Globalization;
+using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 
@@ -13,11 +15,17 @@ public class QueueBoolToBackgroundConverter : IValueConverter
     {
         if (value is bool isPlaying && isPlaying)
         {
-            // TODO: Replace this with AccentColor
+            // TODO: Make it use Accent Color
             return new SolidColorBrush(Colors.Orange) { Opacity = 0.2 };
         }
 
-        // Default background when song is not playing
+        // Get the default card background brush from theme resources
+        if (Application.Current?.TryFindResource("CardBackgroundFillColorDefaultBrush", out var defaultBrush) == true && defaultBrush is IBrush brush)
+        {
+            return brush;
+        }
+
+        // Fallback if resource not found
         return new SolidColorBrush(Color.FromRgb(50, 50, 50));
     }
 

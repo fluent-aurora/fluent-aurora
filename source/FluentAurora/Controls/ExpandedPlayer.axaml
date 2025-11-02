@@ -51,41 +51,11 @@
                                                   MaxScale="{Binding ReactiveArtworkMaxScale}">
                             <controls:ReactiveArtwork.PlaceholderBrush>
                                 <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                    <GradientStop Color="#FF3D3D3D" Offset="0" />
-                                    <GradientStop Color="#FF2D2D2D" Offset="1" />
+                                    <GradientStop Color="{DynamicResource ControlStrokeColorDefault}" Offset="0" />
+                                    <GradientStop Color="{DynamicResource ControlStrokeColorSecondary}" Offset="1" />
                                 </LinearGradientBrush>
                             </controls:ReactiveArtwork.PlaceholderBrush>
                         </controls:ReactiveArtwork>
-
-                        <!-- Album Art on top -->
-                        <!-- TODO: Make it switchable between visualizer and static artwork -->
-                        <Border CornerRadius="12"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                BoxShadow="0 8 32 0 #30000000"
-                                ClipToBounds="True"
-                                IsVisible="False">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                    <GradientStop Color="#FF3D3D3D" Offset="0" />
-                                    <GradientStop Color="#FF2D2D2D" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <Grid>
-                                <!-- Placeholder icon (No Artwork) -->
-                                <ic:SymbolIcon Symbol="MusicNote2"
-                                               FontSize="64"
-                                               Opacity="0.3"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               IsVisible="{Binding SongArtwork, Converter={x:Static ObjectConverters.IsNull}}" />
-
-                                <!-- Artwork -->
-                                <Image Source="{Binding SongArtwork}"
-                                       Stretch="UniformToFill"
-                                       RenderOptions.BitmapInterpolationMode="HighQuality" />
-                            </Grid>
-                        </Border>
                     </Grid>
 
                     <!-- Song Info -->
@@ -167,7 +137,7 @@
                                 <Style Selector="ListBoxItem">
                                     <Setter Property="Padding" Value="0" />
                                     <Setter Property="Margin" Value="0,2,12,2" />
-                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
                                     <Setter Property="CornerRadius" Value="6" />
                                 </Style>
                                 <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
@@ -205,13 +175,14 @@
                                             <Border Grid.Column="0"
                                                     Width="40" Height="40"
                                                     CornerRadius="6"
-                                                    Background="#FF2D2D2D"
+                                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                                     Margin="0,0,12,0">
                                                 <Grid>
                                                     <!-- Not playing icon -->
                                                     <ic:SymbolIcon Symbol="MusicNote2"
                                                                    FontSize="18"
                                                                    Opacity="0.5"
+                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                    HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center"
                                                                    IsVisible="{Binding !IsCurrentlyPlaying}" />

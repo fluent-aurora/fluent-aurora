@@ -2,18 +2,18 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:avalonia="clr-namespace:FluentIcons.Avalonia;assembly=FluentIcons.Avalonia"
+             xmlns:ic="using:FluentIcons.Avalonia.Fluent"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="FluentAurora.Controls.PlaylistArtwork">
     <Border CornerRadius="6" ClipToBounds="True">
         <Grid x:Name="ArtworkGrid">
             <!-- Default icon when no artwork -->
-            <Border Background="#FF2D2D2D"
-                    x:Name="DefaultArtwork">
-                <avalonia:SymbolIcon Symbol="MusicNote2"
+            <Border x:Name="DefaultArtwork"
+                    Background="{DynamicResource ControlFillColorDefaultBrush}">
+                <ic:SymbolIcon Symbol="MusicNote2"
                                FontSize="20"
-                               Opacity="0.5"
                                HorizontalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                VerticalAlignment="Center" />
             </Border>
 

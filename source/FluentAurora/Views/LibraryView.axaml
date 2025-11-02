@@ -20,7 +20,6 @@
 
     <UserControl.Resources>
         <converters:PositionToTimeConverter x:Key="TimeConverter" />
-        <SolidColorBrush x:Key="HoverBrush" Color="#22FFFFFF" />
         <SolidColorBrush x:Key="SongCardBackground" Color="#1AFFFFFF" />
     </UserControl.Resources>
 
@@ -55,7 +54,7 @@
 
         <!-- Hover effect for songs -->
         <Style Selector="Border.song-item:pointerover">
-            <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+            <Setter Property="Background" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
         </Style>
 
         <!-- Toggle Button Style -->
@@ -281,7 +280,7 @@
             <!-- Indexing Progress -->
             <Border Grid.Row="1"
                     IsVisible="{Binding IsIndexing}"
-                    Background="#1AFFFFFF"
+                    Background="{DynamicResource ControlFillColorDefaultBrush}"
                     CornerRadius="8"
                     Padding="16,12"
                     Margin="0,0,0,8"
@@ -289,7 +288,7 @@
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <!-- Loading Icon -->
                     <fa:ProgressRing Grid.Column="0"
-                                     Foreground="Orange"
+                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                      Width="24"
                                      Height="24"
                                      IsIndeterminate="True"
@@ -478,7 +477,7 @@
                                                             <Border Padding="8,6"
                                                                     Margin="0,2"
                                                                     CornerRadius="6"
-                                                                    Background="{StaticResource SongCardBackground}"
+                                                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                                                     Classes="song-item"
                                                                     Cursor="Hand"
                                                                     Tapped="SongElement_OnTapped">
@@ -534,11 +533,11 @@
                                                                     <!-- Music Icon -->
                                                                     <Border Width="32" Height="32"
                                                                             CornerRadius="4"
-                                                                            Background="#FF2D2D2D"
+                                                                            Background="{DynamicResource ControlFillColorDefaultBrush}"
                                                                             Margin="0,0,12,0">
                                                                         <ic:SymbolIcon Symbol="MusicNote2"
                                                                                        FontSize="16"
-                                                                                       Opacity="0.5"
+                                                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                                        HorizontalAlignment="Center"
                                                                                        VerticalAlignment="Center" />
                                                                     </Border>
@@ -725,7 +724,7 @@
                                     <Border Padding="8,6"
                                             Margin="0,2"
                                             CornerRadius="6"
-                                            Background="{StaticResource SongCardBackground}"
+                                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                             Classes="song-item"
                                             Cursor="Hand"
                                             Tapped="SongElement_OnTapped">
@@ -781,11 +780,11 @@
                                             <!-- Music Icon -->
                                             <Border Width="32" Height="32"
                                                     CornerRadius="4"
-                                                    Background="#FF2D2D2D"
+                                                    Background="{DynamicResource ControlFillColorDefaultBrush}"
                                                     Margin="0,0,12,0">
                                                 <ic:SymbolIcon Symbol="MusicNote2"
                                                                FontSize="16"
-                                                               Opacity="0.5"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center" />
                                             </Border>
@@ -1001,7 +1000,7 @@
 
                                                         <!-- Hover Overlay -->
                                                         <Border Name="HoverOverlay"
-                                                                Background="#AA000000"
+                                                                Background="{DynamicResource CardStrokeColorDefaultBrush}"
                                                                 Opacity="0"
                                                                 IsHitTestVisible="False">
                                                             <Border.Transitions>
@@ -1014,7 +1013,7 @@
                                                         <!-- Play Button (shows on hover) -->
                                                         <ic:SymbolIcon Symbol="PlayCircle"
                                                                        FontSize="48"
-                                                                       Foreground="White"
+                                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                        HorizontalAlignment="Center"
                                                                        VerticalAlignment="Center"
                                                                        Name="PlayIcon"
@@ -1086,7 +1085,7 @@
             </Grid.Transitions>
 
             <!-- Blurred Background Overlay -->
-            <Border Background="#AA000000">
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
                 <Border.Effect>
                     <BlurEffect Radius="10" />
                 </Border.Effect>
@@ -1191,7 +1190,7 @@
                                         <Border Padding="8,6"
                                                 Margin="0,2"
                                                 CornerRadius="6"
-                                                Background="{StaticResource SongCardBackground}"
+                                                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                                 Classes="song-item"
                                                 Cursor="Hand"
                                                 Tapped="SongElement_OnTapped">
@@ -1247,11 +1246,11 @@
                                                 <!-- Music Icon -->
                                                 <Border Width="32" Height="32"
                                                         CornerRadius="4"
-                                                        Background="#FF2D2D2D"
+                                                        Background="{DynamicResource ControlFillColorDefaultBrush}"
                                                         Margin="0,0,12,0">
                                                     <ic:SymbolIcon Symbol="MusicNote2"
                                                                    FontSize="16"
-                                                                   Opacity="0.5"
+                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                    HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center" />
                                                 </Border>

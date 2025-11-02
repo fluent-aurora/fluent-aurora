@@ -37,7 +37,7 @@
                     </fa:SettingsExpander>
                 </fa:SettingsExpander.Items>
             </fa:SettingsExpander>
-            
+
             <fa:SettingsExpander Header="Player"
                                  Description="Customize player appearance and behavior">
                 <fa:SettingsExpander.IconSource>
@@ -160,6 +160,34 @@
                                 </fa:SettingsExpander>
                             </StackPanel>
                         </fa:SettingsExpander.Items>
+                    </fa:SettingsExpander>
+                </fa:SettingsExpander.Items>
+            </fa:SettingsExpander>
+            
+            <!-- Debugging -->
+            <fa:SettingsExpander Header="Debugging"
+                                 Description="Configure logging and other diagnostics options">
+                <fa:SettingsExpander.IconSource>
+                    <ic:SymbolIconSource Symbol="Bug" />
+                </fa:SettingsExpander.IconSource>
+                <fa:SettingsExpander.Items>
+                    <!-- Log Level Selector -->
+                    <fa:SettingsExpander Header="Log Level"
+                                         Description="{Binding SelectedLogLevel.Description}">
+                        <fa:SettingsExpander.IconSource>
+                            <ic:SymbolIconSource Symbol="DocumentText" />
+                        </fa:SettingsExpander.IconSource>
+                        <fa:SettingsExpander.Footer>
+                            <ComboBox ItemsSource="{Binding AvailableLogLevels}"
+                                      SelectedItem="{Binding SelectedLogLevel}"
+                                      MinWidth="150">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </fa:SettingsExpander.Footer>
                     </fa:SettingsExpander>
                 </fa:SettingsExpander.Items>
             </fa:SettingsExpander>

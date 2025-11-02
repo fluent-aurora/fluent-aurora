@@ -8,6 +8,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using FluentAurora.Core.Logging;
 using FluentAurora.Core.Settings;
 using FluentAurora.Services;
+using NLog;
+using Logger = FluentAurora.Core.Logging.Logger;
 
 namespace FluentAurora.ViewModels;
 
@@ -17,6 +19,13 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         public AppTheme Theme { get; set; }
         public string DisplayName { get; set; } = string.Empty;
+    }
+
+    public class LogLevelItem
+    {
+        public LogLevel Level { get; set; } = LogLevel.Info;
+        public string DisplayName { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
     }
 
     // Properties
@@ -29,8 +38,10 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private double artworkScaleRangeStart;
     [ObservableProperty] private double artworkScaleRangeEnd;
     [ObservableProperty] private ThemeItem? selectedTheme;
+    [ObservableProperty] private LogLevelItem? selectedLogLevel;
 
     public ObservableCollection<ThemeItem> AvailableThemes { get; }
+    public ObservableCollection<LogLevelItem> AvailableLogLevels { get; }
 
     public string ScaleRangeText => $"{ArtworkScaleRangeStart:F0}% - {ArtworkScaleRangeEnd:F0}%";
 
@@ -39,9 +50,11 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     {
         _settingsManager = settingsManager;
         _themeService = themeService;
-        
+
         AvailableThemes = new ObservableCollection<ThemeItem>();
+        AvailableLogLevels = new ObservableCollection<LogLevelItem>();
         InitializeThemes();
+        InitializeLogLevels();
 
         ApplySettings(_settingsManager.Application);
         _settingsManager.SettingsChanged += OnSettingsChanged;
@@ -59,6 +72,58 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
                 DisplayName = GetThemeDisplayName(theme)
             });
         }
+    }
+
+    private void InitializeLogLevels()
+    {
+        AvailableLogLevels.Add(new LogLevelItem
+        {
+            Level = LogLevel.Trace,
+            DisplayName = "Trace",
+            Description = "Most detailed logging, includes all messages"
+        });
+
+        AvailableLogLevels.Add(new LogLevelItem
+        {
+            Level = LogLevel.Debug,
+            DisplayName = "Debug",
+            Description = "Detailed debugging information"
+        });
+
+        AvailableLogLevels.Add(new LogLevelItem
+        {
+            Level = LogLevel.Info,
+            DisplayName = "Info",
+            Description = "General informational messages"
+        });
+
+        AvailableLogLevels.Add(new LogLevelItem
+        {
+            Level = LogLevel.Warn,
+            DisplayName = "Warning",
+            Description = "Warning messages and recoverable errors"
+        });
+
+        AvailableLogLevels.Add(new LogLevelItem
+        {
+            Level = LogLevel.Error,
+            DisplayName = "Error",
+            Description = "Error messages only"
+        });
+
+        AvailableLogLevels.Add(new LogLevelItem
+        {
+            Level = LogLevel.Fatal,
+            DisplayName = "Fatal",
+            Description = "Only critical/fatal errors"
+        });
+
+        AvailableLogLevels.Add(new LogLevelItem
+        {
+            Level = LogLevel.Off,
+            DisplayName = "Off",
+            Description = "Disable logging completely"
+        });
     }
 
     private string GetThemeDisplayName(AppTheme theme)
@@ -93,7 +158,11 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
             ArtworkScaleRangeStart = settings.Playback.ReactiveArtwork.Scale.Base * 100;
             ArtworkScaleRangeEnd = settings.Playback.ReactiveArtwork.Scale.Max * 100;
 
-            Logger.Info($"Settings loaded - Theme: {settings.UiSettings.Theme}, ReactiveArtwork: {ReactiveArtworkEnabled}, Scale: {ArtworkScaleRangeStart}%-{ArtworkScaleRangeEnd}%");
+            // Debug settings
+            LogLevel logLevel = LogLevelHelper.FromString(settings.Debug.Logger.Level);
+            SelectedLogLevel = AvailableLogLevels.FirstOrDefault(level => level.Level == logLevel);
+
+            Logger.Info($"Settings loaded - Theme: {settings.UiSettings.Theme}, ReactiveArtwork: {ReactiveArtworkEnabled}, Scale: {ArtworkScaleRangeStart}%-{ArtworkScaleRangeEnd}%, LogLevel: {settings.Debug.Logger.Level}");
         }
         finally
         {
@@ -143,6 +212,18 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
             Logger.Trace($"Artwork scale max changed to: {value}%");
         }
     }
+
+    partial void OnSelectedLogLevelChanged(LogLevelItem? value)
+    {
+        if (!_isUpdatingFromSettings && value != null)
+        {
+            _settingsManager.Application.Debug.Logger.Level = LogLevelHelper.ToString(value.Level);
+            Logger.SetLogLevel(value.Level);
+            SaveSettings();
+            Logger.Info($"Log level changed to: {value.DisplayName}");
+        }
+    }
+
 
     private void SaveSettings()
     {

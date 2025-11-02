@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using FluentAurora.Core.Logging;
 using FluentAurora.Core.Playback;
 using FluentAurora.Core.Settings;
 using FluentAurora.Services;
@@ -38,6 +39,7 @@ public partial class App : Application
             _ = Services.GetRequiredService<ThemeService>(); // Forces the applying of saved theme on startup
             MainWindow mainWindow = Services.GetRequiredService<MainWindow>();
             ISettingsManager settingsManager = Services.GetRequiredService<ISettingsManager>();
+            Logger.SetLogLevel(LogLevelHelper.FromString(settingsManager.Application.Debug.Logger.Level));
 
             mainWindow.Opened += (_, _) =>
             {

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using NLog;
 
 namespace FluentAurora.Core.Settings;
 
@@ -9,6 +10,9 @@ public class ApplicationSettingsStore
 
     [JsonPropertyName("playback")]
     public PlaybackSettings Playback { get; set; } = new PlaybackSettings();
+
+    [JsonPropertyName("debug")]
+    public DebuggingSettings Debug { get; set; } = new DebuggingSettings();
 }
 
 public class UiSettings
@@ -48,5 +52,17 @@ public class ReactiveArtwork
 
         [JsonPropertyName("max")]
         public double Max { get; set; } = 1.3;
+    }
+}
+
+public class DebuggingSettings
+{
+    [JsonPropertyName("logging")]
+    public Logging Logger { get; set; } = new Logging();
+
+    public class Logging
+    {
+        [JsonPropertyName("level")]
+        public string Level { get; set; } = "Info";
     }
 }

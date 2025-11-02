@@ -144,7 +144,7 @@ public sealed class AudioPlayerService : IDisposable
             Logger.Warning("Settings Manager not initialized");
             return;
         }
-        
+
         // Stored as 0-1 (float)
         float savedVolume = _settingsManager.Application.Playback.Volume * 100f;
         _volume = Math.Clamp(savedVolume, 0f, 100f);
@@ -613,7 +613,7 @@ public sealed class AudioPlayerService : IDisposable
 
         Logger.Info($"Volume set to {_volume}% (Adjusted: {adjustedVolume * 100}%)");
         VolumeChanged?.Invoke(_volume);
-        
+
         if (_settingsManager != null)
         {
             _settingsManager.Application.Playback.Volume = _volume / 100f;
@@ -818,14 +818,40 @@ public sealed class AudioPlayerService : IDisposable
 
         try
         {
-            // Fft2048 requires an array of at least 2048 elements
-            float[] fftData = new float[2048];
-
-            if (!_fftProvider.GetFftData(fftData))
+            // Check if the provider has enough data and is ready
+            if (!_fftProvider.IsNewDataAvailable)
             {
-                // Normal behaviour, just silently return false
                 return;
             }
+
+            // fftData should hold at least 2048 elements
+            float[] fftData = new float[2048];
+
+            // Safety check to properly check if the _fftProvider has FftSize of 2048
+            if (_fftProvider.FftSize != FftSize.Fft2048)
+            {
+                Logger.Warning($"FFT size mismatch. Expected Fft2048, got {_fftProvider.FftSize}");
+                return;
+            }
+
+            // Try to get FFT data (handle the case where there isn't enough data
+            bool success;
+            try
+            {
+                success = _fftProvider.GetFftData(fftData);
+            }
+            catch (ArgumentException)
+            {
+                // Not enough data
+                return;
+            }
+
+            if (!success)
+            {
+                // Silently return since this is normal behaviour
+                return;
+            }
+
             // Using positive frequencies from FFT Data
             float[] processedData = new float[64];
 
@@ -869,6 +895,10 @@ public sealed class AudioPlayerService : IDisposable
             }
 
             SpectrumDataAvailable?.Invoke(processedData);
+        }
+        catch (ArgumentException)
+        {
+            Logger.Debug("FFT data not available during transition");
         }
         catch (Exception ex)
         {

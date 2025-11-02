@@ -11,6 +11,33 @@
 
     <ScrollViewer>
         <StackPanel Spacing="12" Margin="20">
+            <fa:SettingsExpander Header="Appearance"
+                                 Description="Customize the look and feel of the application">
+                <fa:SettingsExpander.IconSource>
+                    <ic:SymbolIconSource Symbol="PaintBrush" />
+                </fa:SettingsExpander.IconSource>
+                <fa:SettingsExpander.Items>
+                    <!-- Theme Selector -->
+                    <fa:SettingsExpander Header="Theme"
+                                         Description="Change the theme of FluentAurora">
+                        <fa:SettingsExpander.IconSource>
+                            <ic:SymbolIconSource Symbol="WeatherMoon" />
+                        </fa:SettingsExpander.IconSource>
+                        <fa:SettingsExpander.Footer>
+                            <ComboBox ItemsSource="{Binding AvailableThemes}"
+                                      SelectedItem="{Binding SelectedTheme}"
+                                      MinWidth="150">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </fa:SettingsExpander.Footer>
+                    </fa:SettingsExpander>
+                </fa:SettingsExpander.Items>
+            </fa:SettingsExpander>
+            
             <fa:SettingsExpander Header="Player"
                                  Description="Customize player appearance and behavior">
                 <fa:SettingsExpander.IconSource>

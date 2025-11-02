@@ -121,7 +121,7 @@ public class ScrollingTextBlock : Control
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == TextProperty || change.Property == FontSizeProperty || change.Property == FontWeightProperty || change.Property == FontFamilyProperty || change.Property == FontStyleProperty)
+        if (change.Property == TextProperty || change.Property == FontSizeProperty || change.Property == FontWeightProperty || change.Property == FontFamilyProperty || change.Property == FontStyleProperty || change.Property == ForegroundProperty)
         {
             ResetScrolling();
         }

@@ -4,8 +4,24 @@ namespace FluentAurora.Core.Settings;
 
 public class ApplicationSettingsStore
 {
+    [JsonPropertyName("ui")]
+    public UiSettings UiSettings { get; set; } = new UiSettings();
+
     [JsonPropertyName("playback")]
     public PlaybackSettings Playback { get; set; } = new PlaybackSettings();
+}
+
+public class UiSettings
+{
+    [JsonPropertyName("theme")]
+    public AppTheme Theme { get; set; } = AppTheme.Dark;
+}
+
+public enum AppTheme
+{
+    Light,
+    Dark,
+    Black
 }
 
 public class PlaybackSettings

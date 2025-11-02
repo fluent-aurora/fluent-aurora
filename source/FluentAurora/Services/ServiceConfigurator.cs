@@ -2,6 +2,7 @@
 using Avalonia.Controls;
 using FluentAurora.Controls;
 using FluentAurora.Core.Indexer;
+using FluentAurora.Core.Logging;
 using FluentAurora.Core.Playback;
 using FluentAurora.Core.Settings;
 using FluentAurora.ViewModels;
@@ -39,6 +40,24 @@ public static class ServiceConfigurator
         services.AddSingleton<DatabaseManager>();
         services.AddSingleton<PlaybackControlService>();
         services.AddSingleton<StoragePickerService>();
+        services.AddSingleton<ThemeService>(provider =>
+        {
+            ThemeService themeService = new ThemeService();
+            ISettingsManager settingsManager = provider.GetRequiredService<ISettingsManager>();
+            try
+            {
+                ApplicationSettingsStore settings = settingsManager.Application;
+                AppTheme savedTheme = settings.UiSettings.Theme;
+                themeService.SetTheme(savedTheme);
+                Logger.Info($"Applied saved theme during service initialization: {savedTheme}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to apply saved theme: {ex.Message}");
+            }
+
+            return themeService;
+        });
         services.AddSingleton<PlaylistDialogService>(provider =>
         {
             DatabaseManager dbManager = provider.GetRequiredService<DatabaseManager>();

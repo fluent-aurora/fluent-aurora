@@ -14,11 +14,10 @@ public static class DatabaseSchema
         CREATE TABLE IF NOT EXISTS Albums (
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
             Name TEXT NOT NULL,
-            ArtistId INTEGER,
             Year INTEGER,
             Artwork BLOB,
-            UNIQUE(Name, ArtistId),
-            FOREIGN KEY (ArtistId) REFERENCES Artists(Id)
+            ArtworkHash TEXT,
+            UNIQUE(Name, ArtworkHash)
         );";
 
     // Folders Table

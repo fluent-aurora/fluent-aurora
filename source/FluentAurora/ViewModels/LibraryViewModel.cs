@@ -1018,11 +1018,11 @@ public partial class LibraryViewModel : ViewModelBase, IDisposable
 
                 // Update Database
                 List<string?> songFilePathsInOrder = playlistSong.Playlist.PlaylistSongs
-                    .Select(playlistSongViewModel => playlistSongViewModel.Song?.FilePath)
+                    .Select(playlistSongViewModel => playlistSongViewModel.Song.FilePath)
                     .Where(filePath => !string.IsNullOrEmpty(filePath))
                     .ToList();
 
-                DatabaseManager.UpdatePlaylistSongPositions(playlistSong.Playlist.Id, songFilePathsInOrder);
+                DatabaseManager.UpdatePlaylistSongPositions(playlistSong.Playlist.Id, songFilePathsInOrder!);
 
                 Logger.Info($"Moved '{playlistSong.Song.Title}' up in playlist '{playlistSong.Playlist.Name}'");
             }
@@ -1052,11 +1052,11 @@ public partial class LibraryViewModel : ViewModelBase, IDisposable
 
                 // Update Database
                 List<string?> songFilePathsInOrder = playlistSong.Playlist.PlaylistSongs
-                    .Select(playlistSongViewModel => playlistSongViewModel.Song?.FilePath)
+                    .Select(playlistSongViewModel => playlistSongViewModel.Song.FilePath)
                     .Where(filePath => !string.IsNullOrEmpty(filePath))
                     .ToList();
 
-                DatabaseManager.UpdatePlaylistSongPositions(playlistSong.Playlist.Id, songFilePathsInOrder);
+                DatabaseManager.UpdatePlaylistSongPositions(playlistSong.Playlist.Id, songFilePathsInOrder!);
 
                 Logger.Info($"Moved '{playlistSong.Song.Title}' down in playlist '{playlistSong.Playlist.Name}'");
             }

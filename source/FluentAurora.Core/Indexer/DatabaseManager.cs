@@ -1,4 +1,5 @@
-﻿using FluentAurora.Core.Logging;
+﻿using System.Security.Cryptography;
+using FluentAurora.Core.Logging;
 using FluentAurora.Core.Paths;
 using FluentAurora.Core.Playback;
 using Microsoft.Data.Sqlite;
@@ -80,9 +81,8 @@ public class DatabaseManager
             "CREATE INDEX IF NOT EXISTS idx_songs_filepath ON Songs(FilePath)",
             "CREATE INDEX IF NOT EXISTS idx_songs_artistid ON Songs(ArtistId)",
             "CREATE INDEX IF NOT EXISTS idx_songs_albumid ON Songs(AlbumId)",
-            "CREATE INDEX IF NOT EXISTS idx_albums_artistid ON Albums(ArtistId)",
             "CREATE INDEX IF NOT EXISTS idx_artists_name ON Artists(Name)",
-            "CREATE INDEX IF NOT EXISTS idx_albums_name_artist ON Albums(Name, ArtistId)",
+            "CREATE INDEX IF NOT EXISTS idx_albums_name ON Albums(Name)",
             "CREATE INDEX IF NOT EXISTS idx_songs_title ON Songs(Title COLLATE NOCASE)",
             "CREATE INDEX IF NOT EXISTS idx_artists_name_nocase ON Artists(Name COLLATE NOCASE)",
             "CREATE INDEX IF NOT EXISTS idx_albums_name_nocase ON Albums(Name COLLATE NOCASE)",
@@ -326,19 +326,19 @@ public class DatabaseManager
 
         long folderId = context.GetOrCreateFolder(folderInfo.Path, folderInfo.Name, transaction);
         long artistId = context.GetOrCreateArtist(metadata.Artist, transaction);
-        long? albumId = GetAlbumIdIfExists(metadata, artistId, context, transaction);
+        long? albumId = GetAlbumIdIfExists(metadata, context, transaction);
 
         InsertSong(connection, transaction, metadata, artistId, albumId, folderId);
     }
 
-    private long? GetAlbumIdIfExists(AudioMetadata metadata, long artistId, IndexingContext context, SqliteTransaction transaction)
+    private long? GetAlbumIdIfExists(AudioMetadata metadata, IndexingContext context, SqliteTransaction transaction)
     {
         if (string.IsNullOrEmpty(metadata.Album))
         {
             return null;
         }
 
-        return context.GetOrCreateAlbum(metadata.Album, artistId, metadata.ArtworkData, transaction);
+        return context.GetOrCreateAlbum(metadata.Album, metadata.ArtworkData, transaction); // Removed artistId
     }
 
     private (string Path, string Name) GetFolderInfo(string audioFile)
@@ -1002,7 +1002,7 @@ public class DatabaseManager
         private readonly SqliteConnection _connection;
         private readonly Dictionary<string, long> _folderCache;
         private readonly Dictionary<string, long> _artistCache;
-        private readonly Dictionary<(string, long), long> _albumCache;
+        private readonly Dictionary<(string name, string? artworkHash), long> _albumCache;
 
         public IndexingContext(SqliteConnection connection)
         {
@@ -1050,27 +1050,167 @@ public class DatabaseManager
             return id;
         }
 
-        public long GetOrCreateAlbum(string name, long artistId, byte[]? artwork, SqliteTransaction transaction)
+        public long GetOrCreateAlbum(string name, byte[]? artwork, SqliteTransaction transaction)
         {
-            (string name, long artistId) key = (name, artistId);
-            if (_albumCache.TryGetValue(key, out var id))
+            string? artworkHash = ComputeArtworkHash(artwork);
+            (string name, string? artworkHash) cacheKey = (name, artworkHash);
+
+            // Check cache first
+            if (_albumCache.TryGetValue(cacheKey, out var id))
             {
                 return id;
             }
 
+            // Check if an album with this exact name and artwork has exists
+            long? existingAlbumId = FindExistingAlbum(name, artworkHash, transaction);
+            if (existingAlbumId.HasValue)
+            {
+                _albumCache[cacheKey] = existingAlbumId.Value;
+                return existingAlbumId.Value;
+            }
+
+            // Check if album with the same name exists
+            long? albumWithSameName = FindAlbumByNameOnly(name, transaction);
+            if (albumWithSameName.HasValue)
+            {
+                // Album with the same name exists, update its artwork if necessary
+                if (artwork != null && artwork.Length > 0)
+                {
+                    bool artworkUpdated = TryUpdateAlbumArtwork(albumWithSameName.Value, artwork, artworkHash, transaction);
+                    if (artworkUpdated)
+                    {
+                        Logger.Info($"Updated artwork for existing album: {name}");
+                    }
+                }
+
+                // Cache this combination and return the existing album id
+                _albumCache[cacheKey] = albumWithSameName.Value;
+                return albumWithSameName.Value;
+            }
+
+            // Create new album
+            Logger.Info($"Creating new album entry: {name} (Hash: {artworkHash ?? "no artwork"})");
             id = ExecuteInsert(
-                "INSERT INTO Albums (Name, ArtistId, Year, Artwork) VALUES (@Name, @ArtistId, @Year, @Artwork)",
+                "INSERT INTO Albums (Name, Year, Artwork, ArtworkHash) VALUES (@Name, @Year, @Artwork, @ArtworkHash)",
                 transaction,
                 cmd =>
                 {
                     cmd.Parameters.AddWithValue("@Name", name);
-                    cmd.Parameters.AddWithValue("@ArtistId", artistId);
                     cmd.Parameters.AddWithValue("@Year", DBNull.Value);
                     cmd.Parameters.AddWithValue("@Artwork", (object?)artwork ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ArtworkHash", (object?)artworkHash ?? DBNull.Value);
                 });
 
-            _albumCache[key] = id;
+            _albumCache[cacheKey] = id;
             return id;
+        }
+
+        private long? FindAlbumByNameOnly(string name, SqliteTransaction transaction)
+        {
+            const string query = "SELECT Id FROM Albums WHERE Name = @Name LIMIT 1";
+
+            using SqliteCommand cmd = new SqliteCommand(query, _connection, transaction);
+            cmd.Parameters.AddWithValue("@Name", name);
+
+            object? result = cmd.ExecuteScalar();
+            return result as long?;
+        }
+
+        private bool TryUpdateAlbumArtwork(long albumId, byte[] artwork, string? artworkHash, SqliteTransaction transaction)
+        {
+            // Check if the album already has artwork
+            using SqliteCommand checkCmd = new SqliteCommand(
+                "SELECT Artwork, ArtworkHash FROM Albums WHERE Id = @Id",
+                _connection,
+                transaction);
+            checkCmd.Parameters.AddWithValue("@Id", albumId);
+
+            using SqliteDataReader reader = checkCmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                return false;
+            }
+
+            bool hasArtwork = !reader.IsDBNull(0);
+            string? existingHash = reader.IsDBNull(1) ? null : reader.GetString(1);
+            reader.Close();
+
+            // Only update if album has no artwork or new artwork is different
+            if (hasArtwork && (existingHash == artworkHash))
+            {
+                return false;
+            }
+            using SqliteCommand updateCmd = new SqliteCommand(
+                "UPDATE Albums SET Artwork = @Artwork, ArtworkHash = @ArtworkHash WHERE Id = @Id",
+                _connection,
+                transaction);
+            updateCmd.Parameters.AddWithValue("@Id", albumId);
+            updateCmd.Parameters.AddWithValue("@Artwork", artwork);
+            updateCmd.Parameters.AddWithValue("@ArtworkHash", (object?)artworkHash ?? DBNull.Value);
+
+            int rowsAffected = updateCmd.ExecuteNonQuery();
+
+            if (rowsAffected <= 0)
+            {
+                return false;
+            }
+            Logger.Debug($"Updated artwork for album ID {albumId} (was missing: {!hasArtwork})");
+            return true;
+        }
+
+        private static string? ComputeArtworkHash(byte[]? artwork)
+        {
+            if (artwork == null || artwork.Length == 0)
+            {
+                return null;
+            }
+            using SHA256 sha256 = SHA256.Create();
+            byte[] hashBytes = sha256.ComputeHash(artwork);
+            return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+        }
+
+        private long? FindExistingAlbum(string name, string? artworkHash, SqliteTransaction transaction)
+        {
+            string query;
+            query = artworkHash != null ? "SELECT Id FROM Albums WHERE Name = @Name AND ArtworkHash = @ArtworkHash LIMIT 1" : "SELECT Id FROM Albums WHERE Name = @Name AND ArtworkHash IS NULL LIMIT 1";
+
+            using SqliteCommand cmd = new SqliteCommand(query, _connection, transaction);
+            cmd.Parameters.AddWithValue("@Name", name);
+            if (artworkHash != null)
+            {
+                cmd.Parameters.AddWithValue("@ArtworkHash", artworkHash);
+            }
+
+            object? result = cmd.ExecuteScalar();
+            return result as long?;
+        }
+
+        private void UpdateAlbumArtworkIfNeeded(long albumId, byte[]? artwork, SqliteTransaction transaction)
+        {
+            if (artwork == null || artwork.Length == 0)
+            {
+                return;
+            }
+
+            using SqliteCommand checkCmd = new SqliteCommand(
+                "SELECT Artwork FROM Albums WHERE Id = @Id",
+                _connection,
+                transaction);
+            checkCmd.Parameters.AddWithValue("@Id", albumId);
+
+            object? existingArtwork = checkCmd.ExecuteScalar();
+            if (existingArtwork == null || existingArtwork == DBNull.Value)
+            {
+                Logger.Debug($"Updating artwork for album ID {albumId}");
+
+                using SqliteCommand updateCmd = new SqliteCommand(
+                    "UPDATE Albums SET Artwork = @Artwork WHERE Id = @Id",
+                    _connection,
+                    transaction);
+                updateCmd.Parameters.AddWithValue("@Id", albumId);
+                updateCmd.Parameters.AddWithValue("@Artwork", artwork);
+                updateCmd.ExecuteNonQuery();
+            }
         }
 
         private long ExecuteInsert(string sql, SqliteTransaction transaction, Action<SqliteCommand> parameterSetter)
@@ -1090,15 +1230,20 @@ public class DatabaseManager
             return LoadCache("SELECT Name, Id FROM Artists", reader => (reader.GetString(0), reader.GetInt64(1)));
         }
 
-        private Dictionary<(string, long), long> LoadAlbumCache()
+        private Dictionary<(string name, string? artworkHash), long> LoadAlbumCache()
         {
-            Dictionary<(string, long), long> cache = new Dictionary<(string, long), long>();
-            using SqliteCommand cmd = new SqliteCommand("SELECT Name, ArtistId, Id FROM Albums", _connection);
+            Dictionary<(string name, string? artworkHash), long> cache = new Dictionary<(string name, string? artworkHash), long>();
+
+            using SqliteCommand cmd = new SqliteCommand("SELECT Name, ArtworkHash, Id FROM Albums", _connection);
             using SqliteDataReader reader = cmd.ExecuteReader();
 
             while (reader.Read())
             {
-                cache[(reader.GetString(0), reader.GetInt64(1))] = reader.GetInt64(2);
+                string name = reader.GetString(0);
+                string? artworkHash = reader.IsDBNull(1) ? null : reader.GetString(1);
+                long id = reader.GetInt64(2);
+
+                cache[(name, artworkHash)] = id;
             }
 
             Logger.Debug($"Loaded {cache.Count} albums into cache");

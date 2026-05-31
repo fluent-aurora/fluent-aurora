@@ -1,20 +1,19 @@
 using Avalonia.Controls;
-using FluentAvalonia.UI.Windowing;
 using Microsoft.Extensions.DependencyInjection;
 using FluentAurora.ViewModels;
 
 namespace FluentAurora.Views;
 
-public partial class MainWindow : FAAppWindow
+public partial class MainView : UserControl
 {
     // Properties
-    private MainWindowViewModel _viewModel { get; set; }
+    private MainViewViewModel _viewModel { get; set; }
 
     // Constructor
-    public MainWindow()
+    public MainView()
     {
         InitializeComponent();
-        _viewModel = App.Services.GetRequiredService<MainWindowViewModel>();
+        _viewModel = App.Services.GetRequiredService<MainViewViewModel>();
         DataContext = _viewModel;
     }
 }

@@ -1,27 +1,34 @@
 using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core.Plugins;
-using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using FluentAurora.Core.Logging;
-using FluentAurora.Core.Playback;
 using FluentAurora.Core.Settings;
 using FluentAurora.Services;
 using FluentAurora.Views;
-using Microsoft.Extensions.DependencyInjection;
-using NLog;
-using Logger = FluentAurora.Core.Logging.Logger;
 
 namespace FluentAurora;
 
 public partial class App : Application
 {
+    /// <summary>
+    /// Desktop instance
+    /// </summary>
+    public static readonly IClassicDesktopStyleApplicationLifetime? Desktop = Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+
+    /// <summary>
+    /// Main Window instance
+    /// </summary>
     public static Window? MainWindow => Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null;
-    public static IServiceProvider? Services { get; private set; }
+
+    /// <summary>
+    /// DI Services
+    /// </summary>
+    public static IServiceProvider Services = ServiceConfigurator.ConfigureServices();
 
     public override void Initialize()
     {
@@ -30,79 +37,95 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        if (Desktop != null)
         {
-            // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
-            DisableAvaloniaDataAnnotationValidation();
+            // Global exception handlers
+            AppLogger.Trace("Registering global exception handlers");
+            RegisterGlobalExceptionHandlers();
 
-            Services = ServiceConfigurator.ConfigureServices();
-            _ = Services.GetRequiredService<ThemeService>(); // Forces the applying of saved theme on startup
+            // Initialize loading and saving of Settings
+            SettingsService settingsService = Services.GetRequiredService<SettingsService>();
+            AppLogger.SetLogLevel(settingsService.Settings.Debug.LogLevel);
+            settingsService.SaveSettings();
+
+            // Load Language
+            LocalizationService.LoadLanguage();
+
+            // Get MainWindow
+            AppLogger.Debug("Resolving MainWindow from services");
             MainWindow mainWindow = Services.GetRequiredService<MainWindow>();
-            ISettingsManager settingsManager = Services.GetRequiredService<ISettingsManager>();
-            Logger.SetLogLevel(LogLevelHelper.FromString(settingsManager.Application.Debug.Logger.Level));
+            Desktop.MainWindow = mainWindow;
 
+            // Wire up window events
             mainWindow.Opened += (_, _) =>
             {
-                Logger.Info("FluentAurora started");
+                AppLogger.Info("Launching FluentAurora");
+                AppLogger.Debug("Main window opened");
             };
 
-            mainWindow.Closing += (_, _) =>
+            // Application exit handler
+            Desktop.Exit += (_, _) =>
             {
-                Logger.Info("Closing FluentAurora");
-                if (Services.GetService<AudioPlayerService>() is { } audioPlayerService)
-                {
-                    audioPlayerService.Stop();
-                    audioPlayerService.Dispose();
-                }
-                LogManager.Flush();
+                AppLogger.Info("Closing FluentAurora");
+                AppLogger.Debug("Flushing logs before shutdown");
+                AppLogger.Flush();
+                AppLogger.Debug("Shutting down logger");
+                AppLogger.Shutdown();
             };
-
-            desktop.Exit += (_, _) =>
-            {
-                Logger.Shutdown();
-                settingsManager.SaveAll();
-                settingsManager.Dispose();
-            };
-
-            TaskScheduler.UnobservedTaskException += (_, args) =>
-            {
-                args.SetObserved();
-                HandleFatalException(args.Exception);
-            };
-
-            AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-            {
-                if (args.ExceptionObject is Exception ex)
-                {
-                    HandleFatalException(ex);
-                }
-            };
-
-            Dispatcher.UIThread.UnhandledException += (_, args) =>
-            {
-                args.Handled = true;
-                HandleFatalException(args.Exception);
-            };
-
-            desktop.MainWindow = mainWindow;
         }
 
         base.OnFrameworkInitializationCompleted();
     }
 
-    private static void HandleFatalException(Exception ex)
+    /// <summary>
+    /// Registers global exception handlers for unhandled exceptions
+    /// </summary>
+    private void RegisterGlobalExceptionHandlers()
     {
-        Logger.Error("Exception encountered");
-        Logger.LogExceptionDetails(ex);
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            args.SetObserved();
+            AppLogger.Error("Unobserved task exception occurred");
+            HandleFatalException(args.Exception);
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            bool isTerminating = args.IsTerminating;
+            AppLogger.Error($"Unhandled exception in AppDomain (Terminating: {isTerminating})");
+
+            if (args.ExceptionObject is Exception ex)
+            {
+                HandleFatalException(ex);
+            }
+            else
+            {
+                AppLogger.Error($"Non-exception object thrown: {args.ExceptionObject?.GetType().FullName ?? "null"}");
+            }
+        };
+
+        Dispatcher.UIThread.UnhandledException += (_, args) =>
+        {
+            args.Handled = true;
+            AppLogger.Error("Unhandled exception on UI thread");
+            HandleFatalException(args.Exception);
+        };
     }
 
-    private void DisableAvaloniaDataAnnotationValidation()
+    private static void HandleFatalException(Exception ex)
     {
-        DataAnnotationsValidationPlugin[] dataValidationPluginsToRemove = BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
-
-        foreach (DataAnnotationsValidationPlugin plugin in dataValidationPluginsToRemove)
+        try
         {
-            BindingPlugins.DataValidators.Remove(plugin);
+            AppLogger.Error("=== Fatal Exception Encountered ===");
+            AppLogger.LogExceptionDetails(ex, includeEnvironmentInfo: true);
+
+            // Ensure logs are written before a potential crash
+            AppLogger.Flush();
+        }
+        catch
+        {
+            // If logging fails, we can do little about it
+            // Just ensure we don't throw from the exception handler
         }
     }
 }
